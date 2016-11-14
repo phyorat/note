@@ -1,0 +1,469 @@
+TODO: awk 编辑文件; NET Name Space
+
+./lib/modules/3.5.0-32-generic/kernel/drivers/net/igb/igb.ko
+
+**************encryption************************
+/*RSA KEY*/
+sudo openssl genrsa -out private_key.pem 2048
+#encrypt with passphase: 
+sudo openssl genrsa -des3 -out private_key.pem 2048
+
+openssl rsa -in private_key.pem -out public_key.pem -outform PEM -pubout
+
+
+/*valid for little file*/
+openssl rsautl -encrypt -inkey public_key.pem -pubin -in SPI_NIDS.tar.gz -out SPI_NIDS.dat 
+openssl rsautl -decrypt -inkey private_key.pem -in SPI_NIDS.dat -out SPO_NIDS.tar.gz
+
+/*symentric KEY*/
+sudo openssl rand -base64 2048 > key.bin
+sudo openssl rand -base64 -out key.bin 2048
+
+# 随机数的生成：、
+1,seed openssl with semi-random bytes from browser cache
+cd $(find ~/.mozilla/firefox -type d -name Cache)
+openssl rand -rand $(find . -type f -printf '%f:') -base64 2048
+2,head -c 2048 /dev/urandom |openssl enc -base64
+
+
+/*Encripy/Decript  Key*/
+1,
+openssl smime -encrypt -binary -aes-256-cbc -in key.bin -out key.bin.enc -outform DER public_key.pem
+openssl smime -decrypt -binary -in key.bin.enc -inform DER -out keyo.bin -inkey private_key.pem 
+#-passin pass:your_password
+2,
+openssl smime -encrypt -binary -aes256 -in key.bin -out key.bin.enc  -inkey PublicKey1.pem PublicBackupKey.pem
+openssl smime -decrypt -binary -aes256 -in key.bin.enc -out keyo.bin -recip public_key.pem -inkey public_key.pem
+
+
+/*Encript File*/
+openssl enc -aes-256-cbc -salt -in SPI_NIDS.tar.gz -out SPI_NIDS.enc -pass file:./key.bin
+
+/*Decript File*/
+openssl enc -d -aes-256-cbc -in SPI_NIDS.enc -out SPO_NIDS.tar.gz -pass file:./key.bin
+
+/***#################smime solution**/
+openssl req -x509 -nodes -days 100000 -newkey rsa:2048 -keyout privatekey.pem -out publickey.pem  
+      #-subj '/C=CN/ST=SiChuan/L=ChengDu/O=USI/OU=usi/CN=www.usi.com/emailAddress=usi@usi.com'
+opt: 
+openssl req -x509 -nodes -days 100000 -sha256 -newkey rsa:2048 -keyout privatekey.pem -out publickey.pem \
+-subj '/C=CN/ST=SiChuan/L=ChengDu/O=USI/OU=usi/CN=www.usi.com/emailAddress=usi@usi.com'
+
+openssl smime -encrypt -binary -aes256 -in key.bin -outform DEM -out key.bin.enc publickey.pem
+openssl smime -decrypt -binary -in key.bin.enc -inform DEM -out keyo.bin -inkey privatekey.pem
+--->一样
+openssl smime -encrypt -binary -aes256 -in SPI_NIDS.tar.gz -outform DEM -out SPI_NIDS.direc.enc publickey.pem
+openssl smime -decrypt -binary -in SPI_NIDS.direc.enc -inform DEM -inkey privatekey.pem -out SPO_DIREC_NIDS.tar.gz
+
+*************************************
+>>>>
+sudo openssl req -x509 -nodes -days 100000 -sha256 -newkey rsa:2048 -keyout privatekey.pem -out publickey.pem -subj '/C=CN/ST=SiChuan/L=ChengDu/O=USI/OU=usi/CN=www.usi.com/emailAddress=usi@usi.com'
+sudo openssl rand -base64 -out key.bin 2048
+sudo openssl smime -encrypt -binary -aes256 -in key.bin -outform DEM -out key.bin.enc publickey.pem
+sudo openssl enc -aes-256-cbc -salt -in SPI_NIDS.tar.gz -out SPI_NIDS.enc -pass file:./key.bin
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>HEX Compare
+1,
+cmp -l file1.bin file2.bin | 
+mawk 'function oct2dec(oct,     dec) {
+          for (i = 1; i <= length(oct); i++) {
+              dec *= 8;
+              dec += substr(oct, i, 1)
+          };
+          return dec
+      }
+      {
+          printf "%08X %02X %02X\n", $1, oct2dec($2), oct2dec($3)
+      }'
+
+2,
+diff -y <(xxd foo1.bin) <(xxd foo2.bin) | colordiff
+
+
+>>>>>>>>>>>>>>>>>>>>>>>>>>>HEX Compare End
+
+######################Effective MYSQL->optimizing SQL statement###################
+
+0, 为数据库添加索引
+alter table packet add index (cid);
+# 性能参数： explain select * from packet where cid=3\G
+             show table status like 'packet'\G
+# 系统变量比较（globel|session）
+select 'session' as scope,variable_name,variable_value from information_schema.session_variables where variable_name in ('tmp_table_size', 'max_heap_table_size') UNION select 'global', variable_name,variable_value from information_schema.global_variables where variable_name in ('tmp_table_size','max_heap_table_size');
+
+#[mysqld]
+local-infile = 1
+[mysql]
+local-infile = 1
+
+
+######################Effective MYSQL->optimizing SQL statement END################### 
+
+
+1, set pf_ring for snort:
+
+# ***Note: for hw timestamping on supported adapters compile with make CFLAGS_EXTRA="-DIGB_PTP"
+
+cd daq-0.6.2;
+chmod 755 configure;
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib;
+export LIBS="-L/usr/local/lib -lpcap -lpthread"
+
+export LD_LIBRARY_PATH=/usr/local/lib
+export LIBS='-L/usr/local/lib -lpcap -lpfring -lpthread'
+
+*****>>>>>touch configure.ac aclocal.m4 configure Makefile.am Makefile.in
+
+./configure --disable-nfq-module --disable-ipq-module \
+--with-libpcap-includes=/usr/local/include \
+--with-libpcap-libraries=/usr/local/lib \
+--with-libpfring-includes=/usr/local/include/ \
+--with-libpfring-libraries=/usr/local/lib
+
+cd snort-2.9.x;
+make clean ;
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib;
+export LIBS='-L/usr/local/lib -lpfring -lpthread'
+./configure --with-libpcap-includes=/usr/local/include \
+--with-libpcap-libraries=/usr/local/lib \
+--with-libpfring-includes=/usr/local/include/ \
+--with-libpfring-libraries=/usr/local/lib \
+--enable-zlib --enable-perfprofiling \
+--enable-debug --enable-debug-msgs
+
+   sudo ln -s /usr/local/lib/libpfring.so /usr/lib/libpfring.so
+   sudo ln -s /usr/local/lib/libpcap.so /usr/lib/libpcap.so
+   sudo ln -s /usr/local/lib/libpcap.so.1 /usr/lib/libpcap.so.1
+   sudo ln -s /usr/local/lib/libsfbpf.so.0 /usr/lib/libsfbpf.so.0
+   sudo insmod /lib/modules/4.2.0-27-generic/kernel/net/pf_ring/pf_ring.ko enable_tx_capture=0
+   sudo insmod /lib/modules/4.2.0-27-generic/kernel/net/pf_ring/pf_ring.ko enable_tx_capture=0 transparent_mode=2 
+   sudo insmod /lib/modules/4.2.0-27-generic/kernel/net/pf_ring/pf_ring.ko enable_tx_capture=0 transparent_mode=2 min_num_slot=8192 quick_mode=1 
+
+   sudo snort -c etc/snort.conf -A console -y -i p6p1 bindcpu=2 --daq-dir /usr/local/lib/daq --daq=pfring --daq-var clusterid=10 --daq-mode passive
+   sudo snort -c etc/snort.conf -A console -y -i eth0@0 --daq-dir /usr/local/lib/daq --daq=pfring --daq-var clusterid=10 --daq-mode passive
+   sudo snort -c etc/snort.conf -y -i p6p1@0 --daq-dir /usr/local/lib/daq --daq=pfring --daq-var clusterid=10 --daq-mode passive
+
+##################################################
+x. Add the following to your snort.conf:
+config daq: pfring
+config daq_dir: /usr/local/lib/daq
+config daq_var: clusterid=44 (this can be any number < 255)
+y. Start snort with a shell script wrapper like this (assuming you have 8 CPU's and you are sniffing eth2):
+#!/bin/sh
+for COUNTER in 0 1 2 3 4 5 6 7; do
+mkdir /tmp/snort$COUNTER
+kill $(cat /tmp/snort$COUNTER/snort_eth2.pid)
+sleep 5;
+/usr/local/snort/bin/snort -c /etc/snort/snort.conf --pid-path=/tmp/snort$COUNTER -l /tmp/snort$COUNTER --daq-var bindcpu=$COUNTER -D &
+done
+#######################################################
+
+2, Run wireshark as superusr:
+   sudo setcap 'CAP_NET_RAW+eip CAP_NET_ADMIN+eip' /usr/bin/dumpcap
+
+3, Running as user "root" and group "root".
+This could be dangerous.
+
+If you're running Wireshark this way in order to perform live capture, you may want to be aware that there is a better way documented at
+/usr/share/doc/wireshark-common/README.Debian
+
+4, https://github.com/firnsy/barnyard2
+   Barnyard2 is an open source interpreter for Snort unified2 binary output files.
+Its primary use is allowing Snort to write to disk in an efficient manner and
+leaving the task of parsing binary data into various formats to a separate
+process that will not cause Snort to miss network traffic.
+
+5, MULTI-CORE
+   # 怎样知道某个进程在哪个CPU上运行？
+     ps -eo pid,args,psr
+
+   # View the CPU Affinity of a Running Process: $ taskset -p <PID>
+
+   # Pin a Running Process to Particular CPU Core(s): $ taskset -p <COREMASK> <PID>; $taskset -cp <CORE-LIST> <PID>
+   exp: $ taskset -p 0x11 9030
+          pid 9030's current affinity mask: ff
+          pid 9030's new affinity mask: 11
+   Or equivalently: $ taskset -cp 0,4 9030
+   Note that in order to be able to change the CPU affinity of a process, a user must have CAP_SYS_NICE capability. Any user can view the affinity mask of a process.
+
+   # Launch a Program on Specific CPU Cores: $taskset <COREMASK> <EXECUTABLE>
+
+   # Dedicate a Whole CPU Core to a Particular Program:
+   While taskset allows a particular program to be assigned to certain CPUs, that does not mean that no other programs or processes will be scheduled on those CPUs. If you want to prevent this and dedicate a whole CPU core to a particular program, you can use "isolcpus" kernel parameter, which allows you to reserve the CPU core during boot.
+   Add the kernel parameter "isolcpus=<CPU_ID>" to the boot loader during boot or GRUB configuration file. Then the Linux scheduler will not schedule any regular process on the reserved CPU core(s), unless specifically requested with taskset. For example, to reserve CPU cores 0 and 1, add "isolcpus=0,1" kernel parameter. Upon boot, then use taskset to safely assign the reserved CPU cores to your program.
+
+   # 查看进程和线程的树形结构关系
+     [root@jay-linux ~]# pstree | grep processname 
+     [root@jay-linux ~]# pstree -p | grep processname
+   # ps命令还可以查看线程在哪个CPU上运行，命令如下：
+     [root@jay-linux ~]# ps -eo ruser,pid,ppid,lwp,psr,args -L | grep qemu 
+   # H命令可以显示各个线程的情况。（在top命令后，按H键；或者top -H）
+     在top中也可以查看进程（进程）在哪个CPU上执行的。
+     执行top后，按f，按j（选中* J: P = Last used cpu (SMP)），然后按空格或回车退出设置，在top的显示中会多出P这一列是最近一次运行该线程（进程）的CPU。
+
+
+6, Database
+   http://www.techrepublic.com/blog/linux-and-open-source/configure-snort-to-log-packets-to-mysql/
+
+7, DPDK
+   http://dpdk.org/doc/guides/prog_guide/index.html
+
+8, Linux version
+   #if(LINUX_VERSION_CODE < KERNEL_VERSION(2,6,23))
+
+9, us_pktgen
+   sudo scp peng@192.168.2.128:/home/peng/snort/pktgen.c ./us_pktgen.c
+   sudo make -C $KERNEL_DIR SUBDIRS=$PWD modules
+
+10, 在栈内分配一页内存空间，并将指针指向内存页的末尾。这里我们使用 alloca() 函数来分配内存，不要用 malloc() 函数，它会把内存分配在堆上。
+
+11, ethtool
+mii-tool eth0 # negotiation information
+mii-tool eth0 -F 1000baseTx-FD #
+ethtool -S eth0 #查看队列个数
+ethtool -L eth0 combined <N> # 配置队列个数.
+mpstat -I SUM -P ALL 1 10 查看各CPU中断叠加次数，每1秒收集一次，运行10次。
+
+12, 在/proc/interrupts的输出中，可以很直观的通过队列名来定位中断号。对于未成对搭配的队列，它们会简单的命名为eth1-rx-0和eth1-tx-0，搭配成对的队列则会显示为eth1-TxRx-0.
+拥有6个cpu核，可以向配置文件中写入的范围是二进制的000000到二进制的111111。最右侧（最小值）位代表第0号cpu。
+
+13, Flow Control is enabled by default. If you want to disable a flow control capable link partner, use ethtool:
+     ethtool -A ethX autoneg off rx off tx off
+
+14, top命令  
+   top -d 1 -p pid [,pid ...]  //设置为delay 1s，默认是delay 3s  
+   如果想根据内存使用量进行排序，可以shift + m（Sort by memory usage）  
+   查看/proc/process_id/文件夹下的status文件  
+   Name:   php  
+   State:  R (running)  
+   ...
+   VmPeak:   161740 kB  
+   VmSize:   161740 kB  
+   VmLck:         0 kB  
+   VmHWM:    107144 kB  
+   VmRSS:    107144 kB  
+   ...  
+   任务虚拟地址空间的大小 VmSize  
+   应用程序正在使用的物理内存的大小 VmRSS  
+
+15, 背景颜色. R 198 G 236 B 203. 
+
+16, smbclient
+smbclient \\\\192.168.2.105\\usi_share -U lhzy
+ls, get, put
+e.g. smb: \> put /home/union-si/Desktop/screen.zip \branches\asd.zip
+
+##smb share
+sudo mount -t cifs -o username=lhzy01,password,uid=1000,gid=1000 //192.168.2.111/html_src /media/smb111/
+
+17, sig-msg.map update
+sudo /usr/share/oinkmaster/create-sidmap.pl /home/union-si/snort/snort-2.9.8.0/rules > /home/union-si/sid-msg.map
+
+18, mysql
+mysql> truncate signature;
+echo "drop database snort;" | mysql -u root -p
+echo "create database snort;" | mysql -u root -p
+mysql -D snort -u root -p < ./create_mysql 
+echo "grant create,insert,update,select on snort.* to snort01@localhost identified BY '13246501';" | mysql -u root -D mysql -p
+
+echo "show databases;" | mysql -u root -p
+
+19, start-up run
+sudo update-rc.d barnyard2 defaults 21 00
+
+20, 
+apt-get install libdnet libdnet-dev linux-headers-`uname -r` libtool automake make autoconf libpcre3 libpcap-dev flex bison gcc zlib1g-dev g++ libdumbnet-dev
+
+install barnyard2   >>>>>>>>>>>>>>>>>>Line-224:-I/home/lhzy/usi_share/PSIN/trunk/product_ids/shared/usr/include
+			>>>>>>>>>>>>>>>>>>Line-244:-L/home/lhzy/usi_share/PSIN/trunk/product_ids/shared/usr/lib
+sudo mkdir /var/log/barnyard2
+./autogen.sh
+./configure --with-mysql
+sudo apt-get install libmysqlclient-dev
+sudo ln -s /usr/include/dumbnet.h /usr/include/dnet.h
+
+Apache:
+sudo apt-get install apache2
+sudo apt-get install libapache2-mod-php5
+sudo apt-get install libphp-adodb
+
+
+21,perl: warning: Please check that your locale settings:
+	LANGUAGE = (unset),
+	LC_ALL = (unset),
+Fix with:
+export LC_CTYPE=en_US.UTF-8
+export LC_ALL=en_US.UTF-8
+
+22, find files
+find /usr/share/festival/lib/voices -maxdepth 2 -mindepth 2 -type d -exec basename {} 
+
+23, Disable mdns:  
+# chkconfig --level 3 avahi-daemon off
+# service avahi-daemon stop
+
+>>>>Disable ipv6
+# IPv6 disabled
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+
+24, set affinity
+
+for irq in `grep p6p /proc/interrupts | cut -d: -f1`; do \
+        echo ff > /proc/irq/$irq/smp_affinity; \
+done
+
+for irq in `grep em /proc/interrupts | cut -d: -f1`; do \
+        echo f00 > /proc/irq/$irq/smp_affinity; \
+done
+
+25, SUID虽然很好了解决了一些问题，但是同时也会带来一些安全隐患。
+
+因为设置了 SUID 位的程序如果被攻击(通过缓冲区溢出等方面),那么hacker就可以拿到root权限。
+
+因此在安全方面特别要注意那些设置了SUID的程序。
+
+通过以下的命令可以找到系统上所有的设置了suid的文件：
+
+[root@sgrid5 /]# find / -perm -04000 -type f -ls
+
+
+26, If the "Access Your Private Data" launcher fails for some reason, use this command and follow instructions:
+ecryptfs-mount-private
+
+27, chown changing symbolic link
+ chown -h myuser:mygroup mysymbolic
+
+28, Default new file permissions
+When a file is created, it normally inherits the group id of whoever created it. But sometimes you want new files to inherit the group id of the folder where they are created, so you would enable the SGID bit on the parent folder.
+
+29, server interface
+auto eth0 
+iface eth0 inet static  
+address 192.168.X.X
+netmask 255.255.255.0
+gateway 192.168.X.X
+dns-nameservers X.X.X.X 
+|
+>> sudo ifdown eth0 && sudo ifup eth0
+
+I believe if you want to override the DNS nameserver you merely add a line similar to this in your base file under resolv.conf.d.
+>>>>$ sudo vim /etc/resolvconf/resolv.conf.d/base
+Then put your nameserver list in like so:
+nameserver 8.8.8.8
+nameserver 8.8.4.4	
+Finally update resolvconf:
+>>>>$ sudo resolvconf -u
+
+
+30, This will prompt for a password:
+
+zip --encrypt file.zip files
+This is more insecure, as the password is entered/shown as plain text:
+
+zip --password (password) file.zip files
+
+unzip:  unzip -P password zipfile
+
+31,If you want to rename a network interface on Linux in an interactive manner without Udev and/or rebooting the machine, you can just do the following:
+
+ifconfig peth0 down  
+ip link set peth0 name eth0  
+ifconfig eth0 up  
+
+find ifname by lspci:
+root@batman ]# lspci | grep -i ether
+02:02.0 Ethernet controller: Broadcom Corporation NetXtreme BCM5704 Gigabit Ethernet (rev 10)
+02:02.1 Ethernet controller: Broadcom Corporation NetXtreme BCM5704 Gigabit Ethernet (rev 10)
+root@batman ]# cd /sys/bus/pci/devices/0000:02:02.0
+[root@batman 0000:02:02.0]# ls
+[root@batman 0000:02:02.0]# cd net
+[root@batman net]# ls
+eth0
+
+32, Grub-customer
+sudo add-apt-repository ppa:danielrichter2007/grub-customizer
+sudo apt-get update
+sudo apt-get install grub-customizer
+
+33, 用在 AMD64 上 linux-image-3.5.0-32-generic_3.5.0-32.53~precise1_amd64.deb 的下载页面
+如果您正在运行 Ubuntu，请尽量使用像 aptitude 或者 synaptic 一样的软件包管理器，代替人工手动操作的方式从这个网页下载并安装软件包。
+您可以使用以下列表中的任何一个源镜像只要往您的 /etc/apt/sources.list 文件中像下面这样添加一行:
+deb http://security.ubuntu.com/ubuntu precise-security main 
+
+34, vi/vim insert line
+进入vi/vim编辑器，按CTRL+V进入可视化模式（VISUAL BLOCK）
+移动光标上移或者下移，选中多行的开头
+选择完毕后，按大写的的I键，此时下方会提示进入“insert”模式，输入你要插入的注释符，例如#，
+最后按ESC键，你就会发现多行代码已经被注释了
+删除多行注释的方法，同样 Ctrl+v 进入列选择模式，移到光标把注释符选中，按下d，注释就被删除了。
+
+35, add-apt-repository ppa:yogarine/eclipse/ubuntu
+apt-get update 
+apt-get install eclipse-pdt
+
+36, openvpn gui solution: network-manager-openvpn-gnome
+
+37: Get parent pid:  ps -o ppid= -p 1111
+
+38, if_name: enp1s0f0 enp1s0f1 enp3s0 
+
+39, To view a detailed table of contents for archive called my-data.tar.gz, use the following syntax:
+tar -ztvf my-data.tar.gz
+tar -tvf my-data.tar.gz
+tar -tvf my-data.tar.gz 'search-patter'
+
+quiet splash 
+
+
+40,You want the -w option to specify that it's the end of a word:
+find . | xargs grep -sw 's:text'
+
+find and then pass it through sed:
+find /path/to/files -type f -exec sed -i 's/oldstring/new string/g' {} \;
+
+use find to find only non-binary files:
+find . -type f -exec grep -Iq . {} \; -and -print
+
+41, Check hex without index:
+od -An -vtx1 ~/Downloads/packet-pkt.bin
+-j, --skip-bytes=BYTES
+skip BYTES input bytes first
+
+42,wired device not managed
+sudo nano /etc/NetworkManager/NetworkManager.conf
+change the line managed=false to managed=true
+
+Save, stop and start network manager:
+sudo service network-manager restart
+
+43, apt-get --purege remove:
+This could be useful but could also be destructive: It could easily match a package you didn't really want removed, and delete its config without confirmation! Fortunately since package names never contain a space, we can turn it around and drop the -y: 
+#apt-get --purge autoremove $(dpkg --get-selections | grep PACKAGE_NAME | awk '{ print $1}')
+
+44. get first line of output
+#dmidecode -t 4 | grep ID | sed -n 1p > ${HW_INFO}
+
+45. can build in the counter way that set CONFIG_RTE_BUILD_COMBINE_LIBS=y. 
+
+46,nsupdate Examples
+
+The examples below show how nsupdate could be used to insert and delete resource records from the example.com zone. Notice that the input in each example contains a trailing blank line so that a group of commands are sent as one dynamic update request to the master name server for example.com.
+
+# nsupdate
+> update delete oldhost.example.com A
+> update add newhost.example.com 86400 A 172.16.1.1
+> send
+Any A records for oldhost.example.com are deleted. and an A record for newhost.example.com it IP address 172.16.1.1 is added. The newly-added record has a 1 day TTL (86400 seconds)
+# nsupdate
+> prereq nxdomain nickname.example.com
+> update add nickname.example.com 86400 CNAME somehost.example.com
+> send
+The prerequisite condition gets the name server to check that there are no resource records of any type for nickname.example.com. If there are, the update request fails. If this name does not exist, a CNAME for it is added. This ensures that when the CNAME is added, it cannot conflict with the long-standing rule in RFC1034 that a name must not exist as any other record type if it exists as a CNAME. (The rule has been updated for DNSSEC in RFC2535 to allow CNAMEs to have SIG, KEY and NXT records.)
+
+
+47, OpenVPN:  sudo openvpn --config ~/Downloads/openvpn/Open_TCP/China-Taiwan-01.ovpn
+
+
+

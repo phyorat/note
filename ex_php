@@ -1,0 +1,26 @@
+function parse_attributes($string, $separators = array('-','>'), $level = 0){
+    $attributes = explode($separators[$level], $string);
+    $attrs = array();
+    $ret_arr = array();
+    foreach($attributes as $attribute){
+        if(!empty($attribute)){
+            $ex_attr = explode(' ',$attribute);
+            if(!empty($ex_attr[1])){
+                if(count($separators) > $level && strpos($attribute, $separators[$level+1])){
+                    $ret = parse_attributes($attribute, $separators, $level+1);
+                    array_push($ret_arr, $ret);
+                }
+                if (empty($ret_arr))
+                    $attrs[$ex_attr[0]] = str_replace('"', '', $ex_attr[1]);
+                else
+                    $attrs[$ex_attr[0]] = $ret_arr;
+            }
+        }
+    }
+    return $attrs;
+}
+
+
+$returned = parse_attributes('-father_name "John" -father_weight 44.50 -kid >name "Marko" >age 12 -kid >name "Sevda" >age 17 -kid >name "Nathan" >age 19');
+
+print_r($returned);

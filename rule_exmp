@@ -1,0 +1,14 @@
+#dynamic
+activate tcp !$HOME_NET any -> $HOME_NET 143 (flags: PA; content: "|E8C0FFFFFF|/bin"; activates: 1; msg: "IMAP buffer overflow!";)
+dynamic tcp !$HOME_NET any -> $HOME_NET 143 (activated_by: 1; count: 50;)
+
+#flowbits
+    alert tcp any 143 -> any any (msg:"IMAP login"; 
+        content:"OK LOGIN"; flowbits:set,logged_in; 
+        flowbits:noalert;)
+      
+    alert tcp any any -> any 143 (msg:"IMAP LIST"; content:"LIST"; 
+        flowbits:isset,logged_in;)
+
+#...../bin
+e8 c0 ff ff ff 2f 62 69 6e 

@@ -1,0 +1,129 @@
+wireless.radio0=wifi-device                                                     
+wireless.radio0.type='mac80211'                                                 
+wireless.radio0.channel='11'                                                    
+wireless.radio0.hwmode='11g'                                                    
+wireless.radio0.path='10180000.wmac'                                            
+wireless.radio0.htmode='HT20'                                                   
+wireless.@wifi-iface[0]=wifi-iface                                              
+wireless.@wifi-iface[0].device='radio0'                                         
+wireless.@wifi-iface[0].network='lan'                                           
+wireless.@wifi-iface[0].mode='ap'                                               
+wireless.@wifi-iface[0].ssid='OpenWrt'                                          
+wireless.@wifi-iface[0].encryption='none'
+
+wget --mirror -p --convert-links -P ./ https://wiki.strongswan.org/projects/strongswan/wiki/IntroductionTostrongSwan
+
+################################
+#1.先生成根证书
+ipsec pki --gen --outform pem > caKey.pem
+ipsec pki --self --in caKey.pem --dn "C=CN, O=strongSwan, CN=strongSwan CA" --ca --outform pem > caCert.pem
+
+#2.然后是服务器端的证书
+ipsec pki --gen --outform pem > serverKey.pem
+ipsec pki --pub --in serverKey.pem | ipsec pki --issue --cacert caCert.pem --cakey caKey.pem --dn "C=CN, O=strongSwan, CN=192.168.0.103" --san="192.168.0.103" --flag serverAuth --flag ikeIntermediate --outform pem > serverCert.pem
+
+#3.客户端的证书
+ipsec pki --gen --outform pem > clientKey.pem
+ipsec pki --pub --in clientKey.pem | ipsec pki --issue --cacert caCert.pem --cakey caKey.pem --dn "C=CN, O=strongSwan, CN=client" --outform pem > clientCert.pem
+
+################################
+cd /usr/lib/opkg/info
+for i in `ls *.control`
+do
+  echo `grep Size $i | cut -f 2 -d ":"` `echo $i | cut -f 1 -d "."`
+done
+
+If you want the output to be sorted, you can run it through sort:
+
+./opkg_sizes | sort -n
+
+##################################
+
+
+
+China Unicom WCDMA setup:
+http://natisbad.org/E4300/Dell_Wireless_5530_AT_cmd_ref.html
+http://www.thinkwiki.org/wiki/Ericsson_F3507g_Mobile_Broadband_Module
+
+APN: 3gnet 
+Homepage: http://www.wo.com.cn
+WAP Gateway: 10.0.0.172
+WAP Gateway Port: 80 for WAP2.0; 9201 for WAP1.2
+User Name:
+Password: 
+* user name and password are both empty
+
+MMS:
+Relay server URL: http://mmsc.myuni.com.cn
+
+Setting for your laptop to access internet via China Unicom WCDMA:
+
+1. add your mobile phone or data card as a modem to your laptop
+2. Set up modem: extra settings: AT+CGDCONT=1,"IP","3gnet"; +cgeqreq=1,3,64,64
+3. enter *99# as dial number 
+4. user name and password are all empty 
+5. It's OK and you can connect now
+
+
+network ->> routing and redirection ->> vrrpd
+
+mount device mount-point -o uid=foo -o gid=foo
+
+du -sk * | sort -nr | head -10
+
+Universal Serial Bus Communication Device Class Abstract Control Model (USB CDC ACM) 
+
+https://forum.openwrt.org/viewtopic.php?id=55090
+
+++tftp
+++minicom/cu
+--lftp
+
+#missed in barriarbreaker
+CONFIG_USES_INITRAMFS=y
+CONFIG_SIGNED_PACKAGES=y
+CONFIG_PKG_CC_STACKPROTECTOR_NONE=y
+CONFIG_KERNEL_CC_STACKPROTECTOR_NONE=y
+CONFIG_PKG_FORTIFY_SOURCE_NONE=y
+CONFIG_PKG_RELRO_NONE=y
+CONFIG_FEED_targets=y ->> 3.10: CONFIG_FEED_oldpackages=y
+
+++CONFIG_BUSYBOX_DEFAULT_FEATURE_TOUCH_SUSV3=y
+CONFIG_BUSYBOX_DEFAULT_FEATURE_VI_UNDO_QUEUE_MAX=0
+CONFIG_BUSYBOX_DEFAULT_LAST_ID=0
+++CONFIG_BUSYBOX_DEFAULT_FEATURE_SH_NOFORK=y
+
+CONFIG_PACKAGE_usign=y
+
+CONFIG_PACKAGE_kmod-nf-conntrack=y
+CONFIG_PACKAGE_kmod-nf-conntrack6=y
+CONFIG_PACKAGE_kmod-nf-ipt=y
+CONFIG_PACKAGE_kmod-nf-ipt6=y
+CONFIG_PACKAGE_kmod-nf-nat=y
+CONFIG_PACKAGE_kmod-nf-nathelper=y
+
+
+CONFIG_PACKAGE_kmod-usb-serial-dmx_usb_module=y
+CONFIG_PACKAGE_kmod-usb-serial-garmin=y
+CONFIG_PACKAGE_kmod-usb-serial-simple=y
+
+CONFIG_PACKAGE_luci-lib-ip=y
+
+CONFIG_POSTFIX_TLS=y
+CONFIG_POSTFIX_SASL=y
+CONFIG_POSTFIX_LDAP=y
+CONFIG_POSTFIX_CDB=y
+
+CONFIG_PACKAGE_umbim=y
+
+CONFIG_PACKAGE_wwan=y
+
+#missed end
+
+
+
+uci set wireless.@wifi-device[0].disabled=0
+uci set wireless.@wifi-iface[0].ssid=elins
+uci set wireless.@wifi-iface[0].encryption=psk2
+uci set wireless.@wifi-iface[0].key=12345687
+
