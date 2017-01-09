@@ -2,6 +2,8 @@ TODO: awk 编辑文件; NET Name Space
 
 ./lib/modules/3.5.0-32-generic/kernel/drivers/net/igb/igb.ko
 
+A27d141#
+
 **************encryption************************
 /*RSA KEY*/
 sudo openssl genrsa -out private_key.pem 2048
@@ -98,6 +100,17 @@ local-infile = 1
 
 
 ######################Effective MYSQL->optimizing SQL statement END################### 
+0, dpdk-daq
+
+sudo ./src/snort --daq dpdk --daq-var dpdk_args="-c 40" -i dpdk0:dpdk1 --daq-mode inline -c etc/snort.conf -Q -f 'not ip'
+sudo ./src/snort --daq dpdk --daq-var dpdk_args="-c 40" -i dpdk0:dpdk1 --daq-mode passive -c ./etc/snort.conf -A console
+
+
+aclocal
+autoconf
+autoheader
+automake -a
+./configure --with-dpdk-includes=$RTE_SDK/$RTE_TARGET/include --with-dpdk-libraries=$RTE_SDK/$RTE_TARGET/lib
 
 
 1, set pf_ring for snort:
@@ -272,7 +285,11 @@ echo "show databases;" | mysql -u root -p
 sudo update-rc.d barnyard2 defaults 21 00
 
 20, 
-apt-get install libdnet libdnet-dev linux-headers-`uname -r` libtool automake make autoconf libpcre3 libpcap-dev flex bison gcc zlib1g-dev g++ libdumbnet-dev
+sudo apt-get install mysql-server-5.6
+sudo apt-get install libdnet libdnet-dev linux-headers-`uname -r` libtool automake make autoconf libpcre3 libpcap-dev flex bison gcc zlib1g-dev g++ libdumbnet-dev
+sudo apt-get install autoconf libtool libpcap-dev libmysqlclient-dev
+sudo apt-get install apache2 
+sudo apt-get install libmhash-dev libssl-dev
 
 install barnyard2   >>>>>>>>>>>>>>>>>>Line-224:-I/home/lhzy/usi_share/PSIN/trunk/product_ids/shared/usr/include
 			>>>>>>>>>>>>>>>>>>Line-244:-L/home/lhzy/usi_share/PSIN/trunk/product_ids/shared/usr/lib
@@ -465,5 +482,48 @@ The prerequisite condition gets the name server to check that there are no resou
 
 47, OpenVPN:  sudo openvpn --config ~/Downloads/openvpn/Open_TCP/China-Taiwan-01.ovpn
 
+48, default source.list:  sudo -i software-properties-gtk
+
+49, dev label
+sudo ip addr add 192.168.2.24/24 brd + dev pmo0 label pmo0:1
+sudo route add -net 0.0.0.0/0 dev pmo0:1
+sudo route add -net 0.0.0.0/0 gateway 192.168.2.1 dev pmo0:1
+
+50, To remove mysql completely from your system Just type in terminal
+
+sudo apt-get purge mysql-server mysql-client mysql-common mysql-server-core-5.6 mysql-client-core-5.6
+sudo rm -rf /etc/mysql /var/lib/mysql
+sudo apt-get autoremove
+sudo apt-get autoclean
+
+51, refresh DNS
+Run this command to flush DNS:
+sudo /etc/init.d/dns-clean restart
+Followup the above command with this:
+sudo /etc/init.d/networking force-reload
+To flush nscd DNS cache:
+sudo /etc/init.d/nscd restart
+To flush dnsmasq DNS cache:
+sudo /etc/init.d/dnsmasq restart
+If you use BIND this should flush DNS:
+
+sudo /etc/init.d/named restart
+or
+
+sudo rndc restart
+or
+
+sudo rndc exec
+BIND (>= v9.3.0) supports flushing records from a particular domain and also the lan and wan views.source Examples:
+   sudo rndc flush
+
+   sudo rndc flushname askubuntu.com
+
+   sudo rndc flush lan
+
+   sudo rndc flush wan
+
+52, hugepages usage
+$ sudo grep huge /proc/*/numa_maps
 
 
