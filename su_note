@@ -485,8 +485,8 @@ The prerequisite condition gets the name server to check that there are no resou
 48, default source.list:  sudo -i software-properties-gtk
 
 49, dev label
-sudo ip addr add 192.168.2.24/24 brd + dev pmo0 label pmo0:1
-sudo route add -net 0.0.0.0/0 dev pmo0:1
+sudo ip addr add 192.168.2.34/24 brd + dev pmo0 label pmo0:1
+sudo route add -net 192.168.2.0/24 dev pmo0:1
 sudo route add -net 0.0.0.0/0 gateway 192.168.2.1 dev pmo0:1
 
 50, To remove mysql completely from your system Just type in terminal
@@ -525,5 +525,9 @@ BIND (>= v9.3.0) supports flushing records from a particular domain and also the
 
 52, hugepages usage
 $ sudo grep huge /proc/*/numa_maps
+
+53, c lib time
+https://www.gnu.org/software/libc/manual/html_node/Time-Functions-Example.html
+
 
 
