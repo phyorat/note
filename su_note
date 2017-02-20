@@ -335,6 +335,9 @@ for irq in `grep em /proc/interrupts | cut -d: -f1`; do \
         echo f00 > /proc/irq/$irq/smp_affinity; \
 done
 
+check thread on cores:
+for i in $(pgrep squirrel); do ps -mo pid,tid,fname,user,psr -p $i;done
+
 25, SUID虽然很好了解决了一些问题，但是同时也会带来一些安全隐患。
 
 因为设置了 SUID 位的程序如果被攻击(通过缓冲区溢出等方面),那么hacker就可以拿到root权限。
