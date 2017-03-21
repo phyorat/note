@@ -1,4 +1,28 @@
 
+#118
+sudo ./surveyor --daq-var dpdk_c_args=1001 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#12@0
+sudo ./surveyor --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i dpdk0#12@1
+sudo ./surveyor --daq-var dpdk_c_args=4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor03 -i dpdk0#12@2
+sudo ./surveyor --daq-var dpdk_c_args=8 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor04 -i dpdk0#12@3
+sudo ./surveyor --daq-var dpdk_c_args=10 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor05 -i dpdk0#12@4
+sudo ./surveyor --daq-var dpdk_c_args=20 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor06 -i dpdk0#12@5
+sudo ./surveyor --daq-var dpdk_c_args=40 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor07 -i dpdk0#12@6
+sudo ./surveyor --daq-var dpdk_c_args=80 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor08 -i dpdk0#12@7
+sudo ./surveyor --daq-var dpdk_c_args=100 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor09 -i dpdk0#12@8
+sudo ./surveyor --daq-var dpdk_c_args=200 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor10 -i dpdk0#12@9
+sudo ./surveyor --daq-var dpdk_c_args=400 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor11 -i dpdk0#12@10
+sudo ./surveyor --daq-var dpdk_c_args=800 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor12 -i dpdk0#12@11
+
+
+bin/standalone.sh -b 0.0.0.0
+
+#119
+sudo ./surveyor --daq-var dpdk_c_args=11 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#4@0
+sudo ./surveyor --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i dpdk0#4@1
+sudo ./surveyor --daq-var dpdk_c_args=4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor03 -i dpdk0#4@2
+sudo ./surveyor --daq-var dpdk_c_args=8 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor04 -i dpdk0#4@3
+
+
 #111
 
   clock: 2133MHz (0.5ns)
@@ -23,19 +47,55 @@ sudo ./surveyor --daq-var dpdk_args="-c 8 -n 2 --proc-type=auto" -i dpdk0#6@3 -c
 sudo ./surveyor --daq-var dpdk_args="-c 10 -n 2 --proc-type=auto" -i dpdk0#6@4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
 sudo ./surveyor --daq-var dpdk_args="-c 20 -n 2 --proc-type=auto" -i dpdk0#6@5 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
 
+sudo ./surveyor --daq-var dpdk_args="-c 1 -n 2 --proc-type=auto" -i dpdk0#8@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01
+sudo ./surveyor --daq-var dpdk_args="-c 2 -n 2 --proc-type=auto" -i dpdk0#8@1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02
+sudo ./surveyor --daq-var dpdk_args="-c 4 -n 2 --proc-type=auto" -i dpdk0#8@2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor03
+sudo ./surveyor --daq-var dpdk_args="-c 8 -n 2 --proc-type=auto" -i dpdk0#8@3 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor04
+sudo ./surveyor --daq-var dpdk_args="-c 10 -n 2 --proc-type=auto" -i dpdk0#8@4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor05
+sudo ./surveyor --daq-var dpdk_args="-c 20 -n 2 --proc-type=auto" -i dpdk0#8@5 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor06
+sudo ./surveyor --daq-var dpdk_args="-c 40 -n 2 --proc-type=auto" -i dpdk0#8@6 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor07
+sudo ./surveyor --daq-var dpdk_args="-c 80 -n 2 --proc-type=auto" -i dpdk0#8@7 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor08
 
-sudo ./surveyor --daq-var dpdk_args="-c 10 -n 2 --proc-type=auto" -i dpdk0#12@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 20 -n 2 --proc-type=auto" -i dpdk0#12@1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 40 -n 2 --proc-type=auto" -i dpdk0#12@2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 80 -n 2 --proc-type=auto" -i dpdk0#12@3 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 100 -n 2 --proc-type=auto" -i dpdk0#12@4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 200 -n 2 --proc-type=auto" -i dpdk0#12@5 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 400 -n 2 --proc-type=auto" -i dpdk0#12@6 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 800 -n 2 --proc-type=auto" -i dpdk0#12@7 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 1000 -n 2 --proc-type=auto" -i dpdk0#12@8 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 2000 -n 2 --proc-type=auto" -i dpdk0#12@9 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 4000 -n 2 --proc-type=auto" -i dpdk0#12@10 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
-sudo ./surveyor --daq-var dpdk_args="-c 8000 -n 2 --proc-type=auto" -i dpdk0#12@11 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 1 -n 2 --proc-type=auto" -i dpdk0#10@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 2 -n 2 --proc-type=auto" -i dpdk0#10@1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 4 -n 2 --proc-type=auto" -i dpdk0#10@2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 8 -n 2 --proc-type=auto" -i dpdk0#10@3 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 10 -n 2 --proc-type=auto" -i dpdk0#10@4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 20 -n 2 --proc-type=auto" -i dpdk0#10@5 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 40 -n 2 --proc-type=auto" -i dpdk0#10@6 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 80 -n 2 --proc-type=auto" -i dpdk0#10@7 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 100 -n 2 --proc-type=auto" -i dpdk0#10@8 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 200 -n 2 --proc-type=auto" -i dpdk0#10@9 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+
+sudo ./surveyor --daq-var dpdk_args="-c 1 -n 2 --proc-type=auto" -i dpdk0#12@0:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01
+sudo ./surveyor --daq-var dpdk_args="-c 2 -n 2 --proc-type=auto" -i dpdk0#12@1:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02
+sudo ./surveyor --daq-var dpdk_args="-c 4 -n 2 --proc-type=auto" -i dpdk0#12@2:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor03
+sudo ./surveyor --daq-var dpdk_args="-c 8 -n 2 --proc-type=auto" -i dpdk0#12@3:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor04
+sudo ./surveyor --daq-var dpdk_args="-c 10 -n 2 --proc-type=auto" -i dpdk0#12@4:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor05
+sudo ./surveyor --daq-var dpdk_args="-c 20 -n 2 --proc-type=auto" -i dpdk0#12@5:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor06
+sudo ./surveyor --daq-var dpdk_args="-c 40 -n 2 --proc-type=auto" -i dpdk0#12@6:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor07
+sudo ./surveyor --daq-var dpdk_args="-c 80 -n 2 --proc-type=auto" -i dpdk0#12@7:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor08
+sudo ./surveyor --daq-var dpdk_args="-c 100 -n 2 --proc-type=auto" -i dpdk0#12@8:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor09
+sudo ./surveyor --daq-var dpdk_args="-c 200 -n 2 --proc-type=auto" -i dpdk0#12@9:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor10
+sudo ./surveyor --daq-var dpdk_args="-c 400 -n 2 --proc-type=auto" -i dpdk0#12@10:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor11
+sudo ./surveyor --daq-var dpdk_args="-c 800 -n 2 --proc-type=auto" -i dpdk0#12@11:dpdk2#1@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor12
+
+sudo ./surveyor --daq-var dpdk_args="-c 1 -n 2 --proc-type=auto" -i dpdk0#16@0 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 2 -n 2 --proc-type=auto" -i dpdk0#16@1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 4 -n 2 --proc-type=auto" -i dpdk0#16@2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 8 -n 2 --proc-type=auto" -i dpdk0#16@3 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 10 -n 2 --proc-type=auto" -i dpdk0#16@4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 20 -n 2 --proc-type=auto" -i dpdk0#16@5 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 40 -n 2 --proc-type=auto" -i dpdk0#16@6 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 80 -n 2 --proc-type=auto" -i dpdk0#16@7 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 100 -n 2 --proc-type=auto" -i dpdk0#16@8 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 200 -n 2 --proc-type=auto" -i dpdk0#16@9 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 400 -n 2 --proc-type=auto" -i dpdk0#16@10 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 800 -n 2 --proc-type=auto" -i dpdk0#16@11 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 1000 -n 2 --proc-type=auto" -i dpdk0#16@12 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 2000 -n 2 --proc-type=auto" -i dpdk0#16@13 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 4000 -n 2 --proc-type=auto" -i dpdk0#16@14 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
+sudo ./surveyor --daq-var dpdk_args="-c 8000 -n 2 --proc-type=auto" -i dpdk0#16@15 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf
 
 
   --with-daq-includes=DIR DAQ include directory
