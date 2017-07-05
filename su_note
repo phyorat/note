@@ -563,6 +563,124 @@ A block is a sequence of bit or Bytes with a fixed length ie 512 bytes, 4kB, 8kB
 blockdev --getbsz partition
 
 
+56, java, byte check
+		try {
+			byte ptext[] = owner.getBytes();
+			String value = new String(ptext, UTF_8);
+			logger.info("owner: "+value + ", idx 0-" +owner.valueOf(0) + ", idx 1-" +owner.valueOf(1) );
+			System.out.printf("White-Entity2Map-bin: \t%h %h %h %h%n ",
+					ptext[0] & 0x00FF, 
+					ptext[1] & 0x00FF, 
+					ptext[2] & 0x00FF, 
+					ptext[3] & 0x00FF);
+			
+			byte ptext_utf8[] = owner.getBytes("UTF-8");
+			System.out.printf("White-Entity2Map-bin-utf8: \t%h %h %h %h%n ",
+					ptext_utf8[0] & 0x00FF, 
+					ptext_utf8[1] & 0x00FF,
+					ptext_utf8[2] & 0x00FF, 
+					ptext_utf8[3] & 0x00FF);
+			System.out.println(new String(ptext_utf8, "UTF-8"));
+		}
+		catch( UnsupportedEncodingException e) {
+			System.out.println("Unsupported character set");
+		}
+
+57, grep 'open files' /proc/$( pgrep -o <some-user> )/limits
+
+58, DPDK-DAQ
+## Usage
+
+### Setup DPDK
+
+$ cd dpdk-16.04
+$ export RTE_SDK=`pwd`
+$ export RTE_TARGET=build
+
+Patch dpdk with the following patch:
+
+diff --git a/mk/exec-env/linuxapp/rte.vars.mk b/mk/exec-env/linuxapp/rte.vars.mk
+index 5fd7d85..847a3d0 100644
+--- a/mk/exec-env/linuxapp/rte.vars.mk
++++ b/mk/exec-env/linuxapp/rte.vars.mk
+@@ -41,6 +41,8 @@
+ #
+ ifeq ($(CONFIG_RTE_BUILD_SHARED_LIB),y)
+ EXECENV_CFLAGS  = -pthread -fPIC
++else ifeq ($(CONFIG_RTE_BUILD_FPIC),y)
++EXECENV_CFLAGS  = -pthread -fPIC
+ else
+ EXECENV_CFLAGS  = -pthread
+ endif
+
+$ make config T=x86_64-native-linuxapp-gcc
+$ echo 'CONFIG_RTE_BUILD_FPIC=y' >> build/.config
+$ echo 'CONFIG_RTE_BUILD_COMBINE_LIBS=y' >> build/.config
+$ make
+<... setup dpdk ...>
+
+### Setup daq
+
+$ wget https://www.snort.org/downloads/snort/daq-2.0.6.tar.gz
+$ tar xvfz daq-2.0.6.tar.gz
+$ cd daq-2.0.6
+
+<... patch daq-2.0.6 with the above patch ...>
+
+$ aclocal
+$ autoconf
+$ autoheader
+$ automake -a
+$ ./configure --with-dpdk-includes=$RTE_SDK/$RTE_TARGET/include --with-dpdk-libraries=$RTE_SDK/$RTE_TARGET/lib
+$ make && sudo make install
+
+### Setup snort
+
+$ wget https://www.snort.org/downloads/snort/snort-2.9.8.2.tar.gz
+$ tar xvfz snort-2.9.8.2.tar.gz
+$ cd snort-2.9.8.2
+$ ./configure
+
+Patch src/Makefile with following patch:
+
+diff --git a/src/Makefile b/src/Makefile
+index bc947ba..54985aa 100644
+--- a/src/Makefile
++++ b/src/Makefile
+@@ -507,7 +507,7 @@ clean-binPROGRAMS:
+ 
+ snort$(EXEEXT): $(snort_OBJECTS) $(snort_DEPENDENCIES) $(EXTRA_snort_DEPENDENCIES) 
+        @rm -f snort$(EXEEXT)
+-       $(AM_V_CCLD)$(LINK) $(snort_OBJECTS) $(snort_LDADD) $(LIBS)
++       $(AM_V_CCLD)$(LINK) $(snort_OBJECTS) $(snort_LDADD) $(LIBS) -Wl,--whole-archive,-ldpdk,--no-whole-archive
+ 
+ mostlyclean-compile:
+        -rm -f *.$(OBJEXT)
+
+$ make
+<... setup snort ...>
+
+### Run snort with DPDK DAQ module
+
+# 1. dpdk interfaces are named as dpdk0, dpdk1, ...
+# 2. dpdk eal arguments are passed to DPDK DAQ Module via dpdk_args, e.g. dpdk_args="-c 40"
+$ sudo ./src/snort --daq dpdk --daq-var dpdk_args="-c 40" -i dpdk0:dpdk1 --daq-mode inline -c etc/snort.conf -Q -f 'not 
+ip'
+
+----------------------------------------------------------------
+
+
+####SVN####
+
+59.1, svn propset svn:executable "*" someScript
+
+####SVN END####
+
+
+60,
+
+
+
 
 
 

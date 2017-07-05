@@ -14,7 +14,112 @@ sudo ./surveyor --daq-var dpdk_c_args=400 -c /etc/psi_nids_user/surveyor_etc/sur
 sudo ./surveyor --daq-var dpdk_c_args=800 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor12 -i dpdk0#12@11
 
 
+sudo ./surveyor --daq-var dpdk_c_args=11 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#1@0
+
+sudo ./surveyor --daq-var dpdk_c_args=3001 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#2@0 -y
+sudo ./surveyor --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i dpdk0#2@1 -y
+
+matlab license:  4003490
+
 bin/standalone.sh -b 0.0.0.0
+bin/standalone.sh -Djboss.bind.address.management=192.168.2.111
+
+##torjan
+
+--daq-var dpdk_c_args=f001 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk2#2@0 -y
+
+3，在木马和C&C通信过程中，因为要尝试连接，SYN包的比例在TCP总包个数中占80%到85%左右；而正常应用的SYN包个数只占总TCP包个数的10%不到。
+
+
+0, id(uint_64)
+1，(up/down)木马和C&C通信过程中上行流量一般大于下行流量；上下行包的个数比例为1.3到1.5左右，上下行流量字节大小比例为1.8到2.0左右；而正常应用上下行包的个数比例为在0.9到1.1左右，正常应用下下行字节数比约为0.3左右。
+2，(small)木马和C&C通信过程中，小包较多；经验值是小于等于62字节的都算小包；在木马和C&C通信的过程中，这样的包占到总包个数的90%多，而正常应用通信小包过数只占45%到50%左右。
+4，(psh)在木马和C&C通信过程中，因为要进行心跳消息立即处理等事项，TCP包中的PSH包的比例占总TCP的包个数的比例高达55%到60%左右，而正常应用中这类包的比例在20%左右。
+
+5，和正常应用通信相比，木马和C&C的连接数通过比较少，只有几个，而正常应用一般启用多线程模式，会有多个连接。
+6，(tv_sec)和正常应用相比，木马的连接时间比较长。连接的对端个数相对较少。
+
+###vfio-pci
+UDP 协议为主，以 TCP 协议为辅
+
+-->net.ifnames=0 biosdevname=0 iommu=pt intel_iommu=on
+
+vfio_iommu_type1.allow_unsafe_interrupts=1
+/dev/vfio/vfio 
+
+###mysql partition
+mysql> show global variables like "innodb_file_per_table";
+mysql> show global variables like "large_files_support";
+
+insert into nfssn_stats (ipt_id,count,total) values(1,22,33);
+
+
+
+7	发行分中心8	
+青海省>西宁市>西宁一街
+2017-03-20 08:33:36	192.168.2.118	陈十	15609423621	/center8	停用	停止同步
+
+
+SELECT *
+FROM `user`
+LIMIT 0 , 30
+Full texts 	id 	role 所属角色	sequence_num 序列号	username 用户名	locked 是否被锁定	timestamp 创建时间
+	Edit Edit 	Copy Copy 	Delete Delete 	1 	root 	sn123 	test 	0 	2017-04-25 16:46:51
+
+INSERT INTO `distribution_center` VALUES (1,'发行分中心1','北京市','北京市','北京一街','/center1','192.168.2.1','张三','15680506269',0,'2016-10-30 19:10:39','V1.01',4),
+(2,'发行分中心2','四川省','成都市','成都一街','/center2','192.168.2.2','李四','15390017937',0,'2016-10-30 23:15:18','V1.02',4),
+(3,'发行分中心3','广东省','广州市','广州一街','/center3','192.168.2.3','王五','15680506269',0,'2016-10-30 19:10:39','V1.01',4),
+(4,'发行分中心4','浙江省','杭州市','杭州一街','/center4','192.168.2.4','赵六','15390017937',0,'2016-10-30 23:15:18','V1.02',4),
+(5,'发行分中心5','河南省','郑州市','郑州一街','/center5','192.168.2.5','沈七','15390017937',0,'2016-10-30 23:15:18','V1.02',4),
+(6,'发行分中心6','黑龙江省','哈尔滨市','哈尔滨一街','/center6','192.168.2.6','秦八','15390017937',0,'2016-10-30 23:15:18','V1.02',4),
+(9,'发行分中心8','青海省','西宁市','西宁一街','/center8','192.168.2.118','陈十','15609423621',1,'2017-03-20 08:33:36','V1.01',5);
+
+  libdbd-mysql-perl libmysqlclient-dev libmysqlclient18 libqt4-sql-mysql
+  mysql-client mysql-client-5.5 mysql-client-core-5.5 mysql-common
+  mysql-server mysql-server-5.5 mysql-server-core-5.5 php5-mysql
+
+
+<subsystem xmlns="urn:jboss:domain:threads:1.0">
+<bounded-queue-thread-pool name="http-executor" blocking="true">
+<core-threads count="10" per-cpu="20" />
+<queue-length count="10" per-cpu="20" />
+<max-threads count="10" per-cpu="20" />
+<keepalive-time time="10" unit="seconds" />
+</bounded-queue-thread-pool>
+</subsystem>
+
+
+   <persistence-unit name="eid-mgmt-push-threads-pool" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.ejb.HibernatePersistence</provider>
+        <non-jta-data-source>java:jboss/datasources/eid-mgmt</non-jta-data-source>
+        <class>com.pojos.entity.DistributionCenter</class>
+        <class>com.pojos.entity.PushSyncAsset</class>
+        <class>com.pojos.entity.SealArchive</class>
+        <properties>
+           <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
+        </properties>
+   </persistence-unit>
+   
+   <persistence-unit name="eid-mgmt-handle-request" transaction-type="RESOURCE_LOCAL">
+        <provider>org.hibernate.ejb.HibernatePersistence</provider>
+        <non-jta-data-source>java:jboss/datasources/eid-mgmt</non-jta-data-source>
+        <class>com.pojos.entity.Blacklist</class>
+        <class>com.pojos.entity.PushSyncAsset</class>
+        <class>com.pojos.entity.Whitelist</class>
+        <class>com.pojos.entity.SealArchive</class>
+        <properties>
+           <property name="hibernate.dialect" value="org.hibernate.dialect.MySQLDialect"/>
+        </properties>
+   </persistence-unit>
+
+
+  libdbd-mysql-perl libmysqlclient-dev libmysqlclient18 libqt4-sql-mysql
+  mysql-client mysql-client-5.5 mysql-client-core-5.5 mysql-common
+  mysql-server-core-5.5 php5-mysql
+
+
+87VT2-FY2XW-F7K39-W3T8R-XMFGF
+87VT2-FY2XW-F7K39-W3T8R-XMFGF
 
 #119
 sudo ./surveyor --daq-var dpdk_c_args=11 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#4@0
