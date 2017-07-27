@@ -677,7 +677,8 @@ ip'
 ####SVN END####
 
 
-60,
+60, du -sh dir, check folder size
+    date -d @1267619929, convert timestamp to data-time
 
 
 

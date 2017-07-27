@@ -13,6 +13,13 @@ sudo ./surveyor --daq-var dpdk_c_args=200 -c /etc/psi_nids_user/surveyor_etc/sur
 sudo ./surveyor --daq-var dpdk_c_args=400 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor11 -i dpdk0#12@10
 sudo ./surveyor --daq-var dpdk_c_args=800 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor12 -i dpdk0#12@11
 
+./configure --with-daq-includes=/usr/local/include_daq_206 --with-daq-libraries=/usr/local/lib_daq_206 --enable-zlib --enable-perfprofiling --enable-reload
+-knone --daq-var dpdk_c_args=f1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#1@0 -y
+
+-knone --daq-var dpdk_c_args=f1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#4@0 -y
+-knone --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i dpdk0#4@1 -y
+-knone --daq-var dpdk_c_args=4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor03 -i dpdk0#4@2 -y
+-knone --daq-var dpdk_c_args=8 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor04 -i dpdk0#4@3 -y
 
 sudo ./surveyor --daq-var dpdk_c_args=11 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#1@0
 
