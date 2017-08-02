@@ -12,8 +12,10 @@ dec2ip () {
     printf '%s\n' "$ip"
 }
 
+
 v="$@"
 vh=$(echo "obase=16; $v" | bc)
+vh=$(printf '%08x' 0x$vh)
 echo $vh
 vhl=${vh:6:2}${vh:4:2}${vh:2:2}${vh:0:2}
 echo $vhl
