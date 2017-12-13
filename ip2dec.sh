@@ -8,7 +8,8 @@ ip2dec () {
 }
 
 ip2dec "$@"
-hlx=$(echo "obase=16; $hl_dec" | bc)
+hx=$(echo "obase=16; $hl_dec" | bc)
+hlx=$(printf '%08x' 0x$hx)
 echo $hlx
 vhlx=${hlx:6:2}${hlx:4:2}${hlx:2:2}${hlx:0:2}
 vhlx=$(printf '%08x' 0x$vhlx)

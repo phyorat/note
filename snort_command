@@ -14,7 +14,30 @@ sudo ./surveyor --daq-var dpdk_c_args=400 -c /etc/psi_nids_user/surveyor_etc/sur
 sudo ./surveyor --daq-var dpdk_c_args=800 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor12 -i dpdk0#12@11
 
 ./configure --with-daq-includes=/usr/local/include_daq_206 --with-daq-libraries=/usr/local/lib_daq_206 --enable-zlib --enable-perfprofiling --enable-reload
--knone --daq-var dpdk_c_args=f1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#1@0 -y
+-knone --daq-var dpdk_c_args=1 --daq-var dpdk_csn=1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i psi0#1@0 -y
+-knone --daq-var dpdk_c_args=4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i psi1#1@0 -y
+
+-knone --daq-var dpdk_c_args=1 --daq-var dpdk_csn=1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i psi0#2@0 -y
+-knone --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i psi0#2@1 -y
+-knone --daq-var dpdk_c_args=4 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor03 -i psi1#2@0 -y
+-knone --daq-var dpdk_c_args=8 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor04 -i psi1#2@1 -y
+
+-knone --daq-var dpdk_c_args=f1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#2@0 -y
+-knone --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i dpdk0#2@1 -y
+
+-c 800 -n 2 --proc-type=secondary
+
++----+---------------+-------------+--------------+--------------------+--------------
+
+Elastic Cluster
+cfd7df:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjZmQ3ZGZkNTMwZDM3ODllOTdlYTE1NzZkNDUzNDEwMCRiNzc3MzIxNDMxMmQzMzQyMmU1NGQ0NjgzMjZmZDhlNg==
+
++-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------+--------+---------+------------+-----------+
+| id | property_ip   | remote_ips  | result       | reason             | algorithm    | details                                                                                                                                                                                                     | timestamp           | ipt_id | almflag | tv_last    | merge_cnt |
++----+---------------+-------------+--------------+--------------------+--------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------+--------+---------+------------+-----------+
+| 13 | 192.168.3.151 | 14.17.42.43 | 疑似木马     | 疑似木马通信       | 流量分析     | 流量上下行包个数比例异常(1.25)；流量上下行数据量比例异常(3.02)；流量中小包占比较大(0.78)；流量中PSH包占比较大(0.44)；通信端口：36688；连接：正向；                                                          | 2017-08-09 15:07:58 |  33663 |      15 | 1502163478 |       210 |
++----+---------------+-------------+--------------+--------------------+--------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+---------------------+--------+---------+------------+-----------+
+101.226.154.198
 
 -knone --daq-var dpdk_c_args=f1 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#4@0 -y
 -knone --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i dpdk0#4@1 -y
@@ -32,6 +55,8 @@ bin/standalone.sh -b 0.0.0.0
 bin/standalone.sh -Djboss.bind.address.management=192.168.2.111
 
 ##torjan
+select DISTINCT(port_dst) from nfssn_stats where ipt_id in (select id from nfiptet_stats where ip_dst=401554871);
+select DISTINCT(port_dst) from nfssn_stats where ipt_id in (select id from nfiptet_stats where id=68773);
 
 --daq-var dpdk_c_args=f001 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk2#2@0 -y
 
@@ -54,7 +79,7 @@ UDP 协议为主，以 TCP 协议为辅
 vfio_iommu_type1.allow_unsafe_interrupts=1
 /dev/vfio/vfio 
 
-###mysql partition
+###mysql partition, pacth for 5.6: libmysqlclient-dev libqt4-sql-mysql php5-mysql python-mysqldb
 mysql> show global variables like "innodb_file_per_table";
 mysql> show global variables like "large_files_support";
 

@@ -680,6 +680,19 @@ ip'
 60, du -sh dir, check folder size
     date -d @1267619929, convert timestamp to data-time
 
+61, build static lib
+gcc -c -o out.o out.c
+ar rcs libout.a out.o
+
+62, clear history
+cat /dev/null > ~/.bash_history && history -c && exit
+
+63, reset mysql password
+sudo /etc/init.d/mysql stop
+sudo mysqld --skip-grant-tables &
+mysql -u root mysql
+# Replace YOURNEWPASSWORD with your new password!
+UPDATE mysql.user SET Password=PASSWORD('YOURNEWPASSWORD') WHERE User='root'; FLUSH PRIVILEGES; exit;
 
 
 
