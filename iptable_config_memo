@@ -1,0 +1,7 @@
+[jensd@cen ~]$ sudo iptables -t nat -A PREROUTING -d 192.168.3.198 -p tcp --dport 4433 -j DNAT --to-destination 192.168.2.126:4433
+[jensd@cen ~]$ sudo iptables -t nat -A POSTROUTING -d 192.168.2.126 -p tcp --dport 4433 -j SNAT --to-source 192.168.2.119
+[jensd@cen ~]$ sudo iptables -t nat -L -n
+
+lhzy09@ubuntu:~/p_test$ sudo iptables -t nat -A PREROUTING -d 192.168.3.198 -p tcp --dport 22 -j DNAT --to-destination 192.168.2.126:22
+lhzy09@ubuntu:~/p_test$ sudo iptables -t nat -A POSTROUTING -d 192.168.2.126 -p tcp --dport 22 -j SNAT --to-source 192.168.2.119
+
