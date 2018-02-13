@@ -3,6 +3,77 @@
 #include "mn_sf_sys_var.h"
 
 
+
+
+/*****Copy from rte_ring.h*****/
+#define RING_F_SP_ENQ 0x0001 /**< The default enqueue is "single-producer". */
+#define RING_F_SC_DEQ 0x0002 /**< The default dequeue is "single-consumer". */
+/*****Copy from rte_ring.h end*****/
+
+/* daq_dpdk_mbuf_ring collections ****************************/
+daq_dpdk_mpool_collect mn_sf_daq_mbuf_coll [] =
+{
+        {MPOOL_STATSFLOW,    MR_ALL_QUEUES,    DAQ_DP_MP_SF_FLW,    SUR_SF_MP_NUM_POOL_SIZE,  sizeof(StatsFlowDataPlane), 0, 0, DAQ_DPDK_DP_SF_REIN, 0},
+        {MPOOL_SF_STACK,     MR_ALL_QUEUES,    DAQ_DP_MP_SF_STK,    SUR_SF_MP_NUM_POOL_SIZE,  sizeof(ProStackStatNodesTbl), 0, 0, DAQ_DPDK_DP_SF_REIN, 0},
+        {MPOOL_SF_SSN,       MR_ALL_QUEUES,    DAQ_DP_MP_SF_SSN,    SUR_SF_MP_SSN_MASTER_NUM, sizeof(StatsFlowDPSSN), 0, 0, DAQ_DPDK_DP_SF_REIN, 0},
+        {MPOOL_SF_CFL_IPT_HA, MR_PRIMARY_NUMA_NODES,  DAQ_DP_MP_SFCFL_IPTHA,
+                SUR_SF_MP_CFL_MASTER_NUM, sizeof(IPTetConfluenceNodeHaTbl)*MAX_IPTET_CONFLUENCE_HASHSZ, 0, 0, DAQ_DPDK_DP_SF, 0},
+        {MPOOL_SF_CFL_IPTET, MR_PRIMARY_NUMA_NODES,  DAQ_DP_MP_SFCFL_IPT,
+                SUR_SF_MP_CFL_MASTER_NUM, sizeof(IPTetCflStatNode)*MAX_IPTET_CONFLUENCE_NODE_SZ, 0, 0, DAQ_DPDK_DP_SF, 0},
+        {MPOOL_SF_CFL_PP_HA, MR_PRIMARY_NUMA_NODES,  DAQ_DP_MP_SFCFL_PPHA,
+                SUR_SF_MP_CFL_MASTER_NUM, sizeof(ProtoPortCflNodeHaTbl)*MAX_PROTOPORT_CFL_HASHSZ, 0, 0, DAQ_DPDK_DP_SF, 0},
+        {MPOOL_SF_CFL_PROTP, MR_PRIMARY_NUMA_NODES,  DAQ_DP_MP_SFCFL_PP,
+                SUR_SF_MP_CFL_MASTER_NUM, sizeof(ProtoPortCflNode)*MAX_PROTOPORT_CFL_NODE_SZ, 0, 0, DAQ_DPDK_DP_SF, 0},
+        {MPOOL_SF_CFL,       MR_PRIMARY_ONLY,  DAQ_DP_MP_SF_CFL,    SUR_SF_MP_CFL_MASTER_NUM, sizeof(StatsFlowConfluDataPlane), 0, 0, DAQ_DPDK_DP_SF, 0},
+        {MPOOL_SF_PPL,       MR_SINGLETON,     DAQ_DP_MP_SF_PPL,
+                MAX_SSN_CHSUM_EQU_TRACK_PPL_NUM, MAX_SSN_CHSUM_EQU_TRACK_PPL_SIZE, 0, 0, DAQ_DPDK_DP_SF, 0},
+//        {MPOOL_DETECT_MCH, MR_ALL_QUEUES,    "MPOOL_DTM__S%dP%dQ%d",1,0,0,0, DAQ_DPDK_SF_OTHER},
+#ifdef BUILD_SP_DIGGER_MULTI_QUEUES
+        {MPOOL_META,         MR_ALL_QUEUES,    DAQ_DP_MP_DG_MTA,    8*8192,    256, 0, 0, DAQ_DPDK_DP_DIGGER, 0},
+        {MPOOL_META_PAYLOAD, MR_ALL_QUEUES,    DAQ_DP_MP_DG_MPL,    8*8192,    4096, 0, 0, DAQ_DPDK_DP_DIGGER, 0},
+#else
+        {MPOOL_META,         MR_SINGLETON,     DAQ_DP_MP_DG_MTA,    8*8192,    256, 0, 0, DAQ_DPDK_DP_DIGGER, 0},
+        {MPOOL_META_PAYLOAD, MR_SINGLETON,     DAQ_DP_MP_DG_MPL,    8*8192,    4096, 0, 0, DAQ_DPDK_DP_DIGGER, 0},
+#endif
+        {MPOOL_DIGGER,       MR_SINGLETON,     DAQ_DP_MP_DG_INT,    16*8192,   4096, 0, 0, DAQ_DPDK_DP_DIGGER, 0},
+        {MPOOL_PORT_BITMAP,  MR_ALL_QUEUES,    DAQ_DP_MP_SUR_PBM,   4,         sizeof(NetProtoPortIdBitmap), 0, 0, DAQ_DPDK_DP_SUR_REIN, 0},
+        {MPOOL_MATCHED_PKT,  MR_ALL_QUEUES,    DAQ_DP_MP_SUR_MCP,   0x100000,  128, 0, 0, DAQ_DPDK_DP_DIGGER, 0},
+        {MPOOL_GEO,          MR_SINGLETON,     DAQ_DP_MP_DG_GEO,    16*8192,   512, 0, 0, DAQ_DPDK_DP_DIGGER, 0},
+        {MPOOL_AP_MSG,       MR_SINGLETON,     DAQ_DP_MP_MSG_AP,    64,        256, 16, 0, DAQ_DPDK_DP_AP, 0},
+        {MPOOL_AP_SQ_OP,     MR_SINGLETON,     DAQ_DP_MP_EVN_PT,    8192,      SP_MPOOL_BUF_LEN, 0, 0, DAQ_DPDK_DP_SQ_REIN, 0},
+};
+
+daq_dpdk_ring_collect mn_sf_daq_ring_coll [] =
+{
+        {RING_STATSFLOW,     MR_ALL_QUEUES,    DAQ_DP_RING_SF_FLW,    SUR_SF_RING_MSG_QUEUE_SIZE, RING_F_SP_ENQ | RING_F_SC_DEQ, DAQ_DPDK_DP_SF},
+        {RING_SF_STACK,      MR_ALL_QUEUES,    DAQ_DP_RING_SF_STK,    SUR_SF_RING_MSG_QUEUE_SIZE, RING_F_SP_ENQ | RING_F_SC_DEQ, DAQ_DPDK_DP_SF},
+        //{RING_SF_ALY,        RING_ALL_QUEUES,  "RING_SF_ALY_S%dP%dQ%d", SUR_SF_RING_MSG_QUEUE_SIZE, RING_F_SP_ENQ | RING_F_SC_DEQ, DAQ_DPDK_SF_OTHER},
+#ifdef BUILD_SP_DIGGER_MULTI_QUEUES
+        {RING_META,          MR_ALL_QUEUES,    DAQ_DP_RING_DG_MTA,    8*8192, 0, DAQ_DPDK_DP_DIGGER},
+        {RING_META_PAYLOAD,  MR_ALL_QUEUES,    DAQ_DP_RING_DG_MPL,    8*8192, 0, DAQ_DPDK_DP_DIGGER},
+#else
+        {RING_META,          MR_SINGLETON,     DAQ_DP_RING_DG_MTA,    8*8192, 0, DAQ_DPDK_DP_DIGGER},
+        {RING_META_PAYLOAD,  MR_SINGLETON,     DAQ_DP_RING_DG_MPL,    8*8192, 0, DAQ_DPDK_DP_DIGGER},
+#endif
+        {RING_DIGGER,        MR_SINGLETON,     DAQ_DP_RING_DG_INT,    16*8192, 0, DAQ_DPDK_DP_DIGGER},
+        {RING_MSG_MASTER,    MR_SINGLETON,     DAQ_DP_RING_MASTER,    SUR_SF_RING_MSG_QUEUE_SIZE<<8, 0, DAQ_DPDK_DP_AP},
+//        {RING_AP_MSG_DG,     MR_SINGLETON,     DAQ_DP_RING_MSG_DG,    SUR_SF_RING_MSG_QUEUE_SIZE, 0, DAQ_DPDK_DP_DIGGER},
+        {RING_AP_MSG_SQ,     MR_SINGLETON,     DAQ_DP_RING_MSG_SQ,    SUR_SF_RING_MSG_QUEUE_SIZE, 0, DAQ_DPDK_DP_AP},
+//        {RING_AP_MSG_PT,     MR_SINGLETON,     DAQ_DP_RING_MSG_PT,    SUR_SF_RING_MSG_QUEUE_SIZE, 0, DAQ_DPDK_DP_AP},
+        {RING_AP_SQ_OP,      MR_SINGLETON,     DAQ_DP_RING_SQ_SND,    SP_RING_SND_CNT, RING_F_SP_ENQ | RING_F_SC_DEQ, DAQ_DPDK_DP_AP},
+        {RING_AP_SQ_OP_RET,  MR_SINGLETON,     DAQ_DP_RING_SQ_RSV,    SP_RING_RET_CNT, RING_F_SP_ENQ | RING_F_SC_DEQ, DAQ_DPDK_DP_AP},
+};
+
+uint16_t mn_sf_daq_mbuf_get_count(void)
+{
+    return (sizeof(mn_sf_daq_mbuf_coll)/sizeof(daq_dpdk_mpool_collect));
+}
+
+uint16_t mn_sf_daq_ring_get_count(void)
+{
+    return (sizeof(mn_sf_daq_ring_coll)/sizeof(daq_dpdk_ring_collect));
+}
+
 NetFlowProtoMap map_netflow_proto[] =
 {
         {FLOWSTA_PROTO_TCP,         IPPROTO_TCP},

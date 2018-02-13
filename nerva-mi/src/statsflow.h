@@ -28,15 +28,6 @@
 #include <mn_sf_sys_var.h>
 
 
-#define SF_NETPROTOPORT_BITMAP_ELEM     1024
-
-typedef struct __NetProtoPortIdBitmap
-{
-    uint16_t stc[SF_NETPROTOPORT_BITMAP_ELEM];  //Step Count
-    uint64_t bm[SF_NETPROTOPORT_BITMAP_ELEM];   //Bit Map
-} NetProtoPortIdBitmap;
-
-
 void sf_PktInspcProc(Packet *p);
 int sf_PktInspection(/*uint32_t ins_dev_idx, */uint64_t lcore);
 void sf_PktInsCheckOp(void);

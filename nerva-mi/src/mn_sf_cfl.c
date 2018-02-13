@@ -34,14 +34,14 @@ static MYSQL *sfssn_mysql = NULL;
 //static MYSQL *sfins_mysql = NULL;
 static MYSQL *sfstack_mysql = NULL;
 
-static const char *ipt_initfromdb = "select id,ip_src,ip_dst,tppflag,uppflag,tppflag_user,uppflag_user,pflag_other,almflag from %s";
-static const char *ipt_insert = "insert into %s (ip_sum,ip_src,ip_dst,direction,tv_start,tv_upd,cnt,bsize,syn,dns,"
-        "tppflag,uppflag,tppflag_user,uppflag_user,pflag_other,almflag) values(%u,%u,%u,%u,%u,%u,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u)";
-static const char *ipt_update = "update %s set direction=%u,tv_upd=%u,cnt=cnt+%lu,bsize=bsize+%lu,syn=syn+%lu,dns=dns+%lu,"
+static const char *ipt_initfromdb = "select id,ip_src,ip_dst,tppflag,uppflag,tppflag_user,uppflag_user,pflag_other,sf_sta,geo_id,almflag from %s";
+static const char *ipt_insert = "insert into %s (sf_sta,ip_src,ip_dst,geo_id,direction,tv_start,tv_upd,cnt,bsize,syn,dns,"
+        "tppflag,uppflag,tppflag_user,uppflag_user,pflag_other,almflag) values(%u,%u,%u,%lu,%u,%u,%u,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u)";
+static const char *ipt_update = "update %s set sf_sta=%u,geo_id=%lu,direction=%u,tv_upd=%u,cnt=cnt+%lu,bsize=bsize+%lu,syn=syn+%lu,dns=dns+%lu,"
         "tppflag=%lu,uppflag=%lu,tppflag_user=%lu,uppflag_user=%lu,pflag_other=%lu,almflag=%u where id=%lu";
-static const char *ipt_upd_almflag = "update %s set almflag=%u where id=%lu";
+static const char *ipt_upd_almflag = "update %s set sf_sta=%u,geo_id=%lu,almflag=%u where id=%lu";
 //static const char *ipt_select = "select ip_src,ip_dst,tv_upd,cnt,syn from %s where id=%u";
-static const char *ipt_delete = "delete from %s where id=%lu";
+//static const char *ipt_delete = "delete from %s where id=%lu";
 static const char *iptssn_insert = "insert into %s (ipt_id,proto,direction,port_src,port_dst,cnt_up,bsz_up,cnt_down,bsz_down,"
         "flg_psh,bsz_sml,tv_start,tv_upd,tv_dur,state) values(%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u)";
 /*static const char *iptssn_update = "update %s set cnt_up=%u,bsz_up=%u,cnt_down=%u,bsz_down=%u,"
@@ -54,21 +54,55 @@ static const char *protp_set_pp_id = "SET @pp_id=LAST_INSERT_ID()";
 static const char *protp_update = "update %s set tv_upd=%u,cnt_vi=cnt_vi+%lu,bsz_vi=bsz_vi+%lu,"
         "cnt_vo=cnt_vo+%lu,bsz_vo=bsz_vo+%lu,id=(select @pp_id := id) "
         "where ipt_id=%lu and proto=%u and port_idx=%u and user_set=%u ORDER BY id DESC LIMIT 1";
-static const char *protp_scale_throw = "INSERT INTO %s (pp_id,scl_cmb,tv_upd,cnt_vi,bsz_vi,cnt_vo,bsz_vo,direc) "
-        "SELECT @pp_id,%u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_vi=VALUES(cnt_vi),bsz_vi=VALUES(bsz_vi),"
+static const char *protp_scale_throw = "INSERT INTO %s (ipt_id,geo_id,pp_id,scl_cmb,tv_upd,cnt_vi,bsz_vi,cnt_vo,bsz_vo,direc) "
+        "SELECT %u,%lu,@pp_id,%u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_vi=VALUES(cnt_vi),bsz_vi=VALUES(bsz_vi),"
         "cnt_vo=VALUES(cnt_vo),bsz_vo=VALUES(bsz_vo)";
-static const char *protp_scale_add = "INSERT INTO %s (pp_id,scl_cmb,tv_upd,cnt_vi,bsz_vi,cnt_vo,bsz_vo,direc) "
-        "SELECT @pp_id,%u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_vi=cnt_vi+VALUES(cnt_vi),bsz_vi=bsz_vi+VALUES(bsz_vi),"
+static const char *protp_scale_add = "INSERT INTO %s (ipt_id,geo_id,pp_id,scl_cmb,tv_upd,cnt_vi,bsz_vi,cnt_vo,bsz_vo,direc) "
+        "SELECT %u,%lu,@pp_id,%u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_vi=cnt_vi+VALUES(cnt_vi),bsz_vi=bsz_vi+VALUES(bsz_vi),"
         "cnt_vo=cnt_vo+VALUES(cnt_vo),bsz_vo=bsz_vo+VALUES(bsz_vo)";
-static const char *scale_cmb_table_name [] = {
+
+//static const char *geo_set_ipt_id = "SET @ipt_id=LAST_INSERT_ID()";
+/*static const char *geo_scale_throw = "INSERT INTO %s (geo_id,scl_cmb,tv_upd,cnt_up,bsz_up,cnt_dn,bsz_dn) "
+        "SELECT %u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_up=VALUES(cnt_up),bsz_up=VALUES(bsz_up),"
+        "cnt_dn=VALUES(cnt_dn),bsz_dn=VALUES(bsz_dn)";*/
+static const char *geo_scale_add = "INSERT INTO %s (geo_id,scl_cmb,tv_upd,cnt_up,bsz_up,cnt_dn,bsz_dn) "
+        "SELECT %lu,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_up=cnt_up+VALUES(cnt_up),bsz_up=bsz_up+VALUES(bsz_up),"
+        "cnt_dn=cnt_dn+VALUES(cnt_dn),bsz_dn=bsz_dn+VALUES(bsz_dn)";
+static const char *geo_scale_reset_cmb = "UPDATE %s SET cnt_up=0,bsz_up=0,cnt_dn=0,bsz_dn=0 WHERE scl_cmb=%u";
+
+//Delete Instance, reference by ipt_id
+static const char *nfstats_del_ins_gb = "DELETE t1,t3,t5,t6,t7,t8,t9 FROM nfiptet_stats t1 "
+        "LEFT JOIN nfiptet_geo t2 ON t2.ipt_id=t1.id "
+        "LEFT JOIN nfssn_stats t3 ON t3.ipt_id=t1.id "
+        //"LEFT JOIN nfssn_stats_sfaly t4 ON t4.ipt_id=t1.id "
+        "LEFT JOIN nfprotp_stats t5 ON t5.ipt_id=t1.id "
+        "LEFT JOIN nfprotp_stats_scale_l1 t6 ON t6.ipt_id=t1.id "
+        "LEFT JOIN nfprotp_stats_scale_l2 t7 ON t7.ipt_id=t1.id "
+        "LEFT JOIN nfprotp_stats_scale_l3 t8 ON t8.ipt_id=t1.id "
+        "LEFT JOIN nfprotp_stats_scale_l4 t9 ON t9.ipt_id=t1.id WHERE t1.id=%lu";
+
+
+static const char *scale_cmb_protp_table_name [] = {
+#if SUR_SF_SCALE_EN_MINUTES
         "nfprotp_stats_scale_l1",
+#endif
         "nfprotp_stats_scale_l2",
         "nfprotp_stats_scale_l3",
         "nfprotp_stats_scale_l4",
 };
+
+static const char *scale_cmb_geo_table_name [] = {
+#if SUR_SF_SCALE_EN_MINUTES
+        "nfiptet_geo_scale_l1",
+#endif
+        "nfiptet_geo_scale_l2",
+        "nfiptet_geo_scale_l3",
+        "nfiptet_geo_scale_l4",
+};
+
 /*static const char *protp_scale_throw = "REPLACE INTO nfprotp_stats_scale (pp_id,scl_cmb,tv_upd,cnt_vi,bsz_vi,cnt_vo,bsz_vo) "
         "SELECT @pp_id,%u,%u,%u,%u,%u,%u";*/
-static const char *protp_delete = "delete from %s where ipt_id=%lu";
+//static const char *protp_delete = "delete from %s where ipt_id=%lu";
 
 static const char *stack_insert = "insert into %s (ps_id,name,port_idx,user,port,direction,cnt,bsz,bps) values(%u,'%s',%u,%u,%u,%u,%lu,%lu,%u)";
 static const char *stack_update = "update %s set port=%u,cnt=%lu,bsz=%lu,bps=%u where ps_id=%u and direction=%u";
@@ -79,7 +113,7 @@ static const char *iptssn_pkt_sample = "INSERT INTO nfssn_track_hbpkt (ssn_id,ip
 
 
 static char sql_cfl[1024] = "";
-static char sql_cfl_pp_scl[1024] = "";
+static char sql_cfl_scl[1024] = "";
 static char sql_cfl_ssn[1024] = "";
 //static char sql_cfl_dbins[1024] = "";
 static char sql_cfl_stack[1024] = "";
@@ -451,10 +485,12 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
                 apnode.ppflag.tcp_user = strtoul(row[5], NULL, 10);
                 apnode.ppflag.udp_user = strtoul(row[6], NULL, 10);
                 apnode.ppflag.other = strtoul(row[7], NULL, 10);
-                apnode.almflag = (uint32_t)strtoul(row[8], NULL, 10);
+                apnode.sf_sta = (uint32_t)strtoul(row[8], NULL, 10);
+                apnode.geo_index = strtoul(row[9], NULL, 10);
+                apnode.almflag = (uint32_t)strtoul(row[10], NULL, 10);
                 apnode.aly_stat |= SFALY_IPT_ACTIVE|SFALY_IPT_INSPECT_PULSE;
-                apnode.cnt = 0;
-                apnode.bsize = 0;
+                apnode.scl_st[SF_SCALE_STAGE_META].cnt = 0;
+                apnode.scl_st[SF_SCALE_STAGE_META].bsz = 0;
                 apnode.syn = 0;
                 apnode.dns = 0;
                 apnode.tv_upd = 0;
@@ -465,8 +501,8 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
                 apnode.ppflag.tcp_user &= ~ppflag_user_renew;
                 apnode.ppflag.udp_user &= ~ppflag_user_renew;
 
-                JHashIpTetAdd((IPTetStatNode**)(sfdp_ctl->h_tnode.hatbl), (IPTetStatNodePool*)&sfdp_ctl->tnode,
-                        (IPTetStatNode*)&apnode, NULL, 1, 1);
+                JHashIpTetAdd((IPTetStatNodeHaTbl*)(sfdp_ctl->h_tnode), (IPTetStatNodePool*)sfdp_ctl->tnode,
+                        (IPTetStatNode*)&apnode, NULL, 0x3, (sfdp_ctl->nsock-1));
             }
         }
 
@@ -496,7 +532,7 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
     else {
         if ( row_cnt > 0 ) {
             LogMessage("%s: nf_proto-port_stats enabled scaling\n", __func__);
-            sfGlobalInfo.envset_scl_flag |= SF_GLOB_VAR_PP_SCALE_DEEP_LIT;
+            sfGlobalInfo.envset_scl_flag |= SF_GLOB_VAR_SCALE_DEEP_LIT;
         }
         else {
             LogMessage("%s: nf_proto-port_stats disable scaling\n", __func__);
@@ -519,7 +555,8 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
         mysql_free_result(mysql_res);
     }
 
-    //Current Inspection SSN ID
+    //Current Inspection ID
+    sfGlobalInfo.cur_iptid = 0;
     sfGlobalInfo.cur_ssnid = 0;
 /*    snprintf(sql, sizeof(sql), "select cur_ssn_id from %s",
             map_nf2dbtbl[NF_INS_TRACK].tbl_name);
@@ -589,9 +626,11 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
         mn_MysqlTransCommit(sf_mysql);
     }
 
-    LogMessage("%s: done, iptet total %lu, cur_num %lu, node_num %d, max_ssn %lu\n", __func__,
-    		sizeof(sfdp_ctl->tnode.nodes)/sizeof(IPTetCflStatNode),
-    		sfGlobalInfo.max_iptid, sfdp_ctl->tnode.npcnt, sfGlobalInfo.max_ssnid);
+    LogMessage("%s: done, iptet total %lu, cur_num %lu, node_num %d/%d, max_ssn %lu\n", __func__,
+            sfdp_ctl->tnode[0].total*sfdp_ctl->nsock,
+            sfGlobalInfo.max_iptid,
+            sfdp_ctl->tnode[0].npcnt, (NULL != sfdp_ctl->tnode[1].nodes ? sfdp_ctl->tnode[1].npcnt:0),
+            sfGlobalInfo.max_ssnid);
 
     return 0;
 }
@@ -635,9 +674,9 @@ static int sf_IptetMergeFromDp(StatsFlowConfluDataPlane *sfdp_ctl, StatsFlowData
 
     tnode = t_nodepool->nodes;
     for(i = 0; i < t_nodepool->npidx; i++, tnode++) {
-    	ret = JHashIpTetAdd((IPTetStatNode**)(sfdp_ctl->h_tnode.hatbl), (IPTetStatNodePool*)&sfdp_ctl->tnode,
-    			tnode, (IPTetStatNode**)&targ_tnode, 1, 0);
-    	if ( 0 != ret ) 			//Node Add Failed
+    	ret = JHashIpTetAdd((IPTetStatNodeHaTbl*)(sfdp_ctl->h_tnode), (IPTetStatNodePool*)sfdp_ctl->tnode,
+    			tnode, (IPTetStatNode**)&targ_tnode, 0x1, (sfdp_ctl->nsock-1));
+    	if ( ret < 0 ) 			//Node Add Failed
     	    break;
 
     	//For Debug
@@ -672,8 +711,8 @@ static int sf_IptetMergeFromDp(StatsFlowConfluDataPlane *sfdp_ctl, StatsFlowData
         //Protocol-Port
         pnode = tnode->pp_node;
         while ( pnode ) {
-            ret = JHashProPortAdd((ProtoPortNode**)sfdp_ctl->h_pnode.hatbl, (ProtoPortNodePool*)&sfdp_ctl->pnode,
-                    pnode, &targ_pnode, (IPTetStatNode*)targ_tnode, 1);
+            ret = JHashProPortAdd((ProtoPortNodeHaTbl*)sfdp_ctl->h_pnode, (ProtoPortNodePool*)sfdp_ctl->pnode,
+                    pnode, &targ_pnode, (IPTetStatNode*)targ_tnode, 1, (uint8_t)(ret));
             if ( 0 != ret )
                 break;
 
@@ -684,8 +723,9 @@ static int sf_IptetMergeFromDp(StatsFlowConfluDataPlane *sfdp_ctl, StatsFlowData
         }
     }
 
-    LogMessage("%s: current node count %d, merge_total(%d) new %d, upd %d, new_p %d, upd_p %d\n", __func__,
-    		sfdp_ctl->tnode.npcnt, t_nodepool->npidx,
+    LogMessage("%s: current node count %d/%d, merge_total(%d) new %d, upd %d, new_p %d, upd_p %d\n", __func__,
+    		sfdp_ctl->tnode[0].npcnt, (NULL != sfdp_ctl->tnode[1].nodes ? sfdp_ctl->tnode[1].npcnt:0),
+    		t_nodepool->npidx,
     		new_node_cnt, upd_node_cnt,
     		new_node_cnt_p, upd_node_cnt_p);
 
@@ -729,7 +769,7 @@ static int sf_StackResetBps(StatsFlowConfluDataPlane *sfdp_ctl)
     return 0;
 }
 
-static inline void sf_IptetSyncDBConfirm(IPTetCflStatNode* nodes,
+static inline void sf_IptetSyncDBConfirm(IPTetConfluenceNodeHaTbl *hanodes, IPTetConfluenceNodePool *nodepool,
         uint32_t node_start, uint32_t node_end, uint32_t scale_sta)
 {
     uint32_t i, scl_idx;
@@ -739,15 +779,23 @@ static inline void sf_IptetSyncDBConfirm(IPTetCflStatNode* nodes,
 
     //LogMessage("%s: node_start %d, node_end %d\n", __func__, node_start, node_end);
 
-    tnode = nodes + node_start;
+    tnode = nodepool->nodes + node_start;
     for (i=node_start; i<=node_end; i++, tnode++) {
         switch ( tnode->fsm ) {
         case NF_NODEIPT_NEW_TOBE_CFM:
             sfGlobalInfo.max_iptid = tnode->dbid;
 
             //Clear Stats
-            tnode->cnt = 0;
-            tnode->bsize = 0;
+            tnode->scl_st[SF_SCALE_STAGE_META].cnt = 0;
+            tnode->scl_st[SF_SCALE_STAGE_META].bsz = 0;
+            if ( tnode->geo_index > 0 ) {
+                for ( scl_idx=SF_SCALE_STAGE_MIN; scl_idx<SF_SCALE_STAGE_SAVE; scl_idx++ ) {
+                    if ( (0x01<<scl_idx) & scale_sta ) {
+                        tnode->scl_st[scl_idx].cnt = 0;
+                        tnode->scl_st[scl_idx].bsz = 0;
+                    }
+                }
+            }
             tnode->syn = 0;
             tnode->dns = 0;
             tnode->fsm = NF_NODEIPT_SYNCED;
@@ -755,8 +803,16 @@ static inline void sf_IptetSyncDBConfirm(IPTetCflStatNode* nodes,
             break;
         case NF_NODEIPT_UPD_TOBE_CFM:
             //Clear Stats
-            tnode->cnt = 0;
-            tnode->bsize = 0;
+            tnode->scl_st[SF_SCALE_STAGE_META].cnt = 0;
+            tnode->scl_st[SF_SCALE_STAGE_META].bsz = 0;
+            if ( tnode->geo_index > 0 ) {
+                for ( scl_idx=SF_SCALE_STAGE_MIN; scl_idx<SF_SCALE_STAGE_SAVE; scl_idx++ ) {
+                    if ( (0x01<<scl_idx) & scale_sta ) {
+                        tnode->scl_st[scl_idx].cnt = 0;
+                        tnode->scl_st[scl_idx].bsz = 0;
+                    }
+                }
+            }
             tnode->syn = 0;
             tnode->dns = 0;
             tnode->fsm = NF_NODEIPT_SYNCED;
@@ -765,10 +821,14 @@ static inline void sf_IptetSyncDBConfirm(IPTetCflStatNode* nodes,
                 tnode->qry_flag &= ~(NF_IPTET_FLOW_DATA|NF_IPTET_FLOW_DATA_QNC);
                 tnode->aly_stat |= SFALY_IPT_ACTIVE|SFALY_IPT_INSPECT_PULSE;
             }
-            if ( tnode->qry_flag&NF_IPTET_ALM_FLAG_QNC )
-                tnode->qry_flag &= ~(NF_IPTET_ALM_FLAG|NF_IPTET_ALM_FLAG_QNC);
+            if ( tnode->qry_flag&NF_IPTET_DEDICATE_FLAG_QNC )
+                tnode->qry_flag &= ~(NF_IPTET_DEDICATE_FLAG|NF_IPTET_DEDICATE_FLAG_QNC);
             break;
         default:
+            if ( tnode->expire ) {
+                //remove node which didn't update for a long time
+                JHashIpTetCflDel(hanodes, nodepool, &tnode->tet, tnode->dbid);
+            }
             break;
         }
 
@@ -777,10 +837,10 @@ static inline void sf_IptetSyncDBConfirm(IPTetCflStatNode* nodes,
             //ppnflag = SF_CFL_GET_PPFLAG(ppnode->nk.proto_idx, ppnode->nk.apport_idx);
             SF_CFL_SET_PPFLAG(&tnode->ppflag.flag[0], ppnode->nk.user_set,
                     ppnode->nk.proto_idx, ppnode->nk.apport_idx);
-            ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].cnt = 0;
-            ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].bsz = 0;
+            ppnode->scl_st[SF_SCALE_STAGE_META].cnt = 0;
+            ppnode->scl_st[SF_SCALE_STAGE_META].bsz = 0;
 
-            for ( scl_idx=SF_PROTP_SCALE_STAGE_MIN; scl_idx<SF_PROTP_SCALE_STAGE_SAVE; scl_idx++ ) {
+            for ( scl_idx=SF_SCALE_STAGE_MIN; scl_idx<SF_SCALE_STAGE_SAVE; scl_idx++ ) {
                 if ( (0x01<<scl_idx) & scale_sta ) {
                     ppnode->scl_st[scl_idx].cnt = 0;
                     ppnode->scl_st[scl_idx].bsz = 0;
@@ -789,7 +849,7 @@ static inline void sf_IptetSyncDBConfirm(IPTetCflStatNode* nodes,
             ppnode = ppnode->pnxt;
         }
 
-        if ( (sfGlobalInfo.envset_scl_flag & scale_sta) == sfGlobalInfo.envset_scl_flag ) {      //Ready to Go Next Round
+        if ( (sfGlobalInfo.envset_scl_flag & (SF_GLOB_VAR_SCALE_MASK&scale_sta)) == sfGlobalInfo.envset_scl_flag ) {      //Ready to Go Next Round
             tnode->pp_node = NULL;
         }
 
@@ -798,34 +858,55 @@ static inline void sf_IptetSyncDBConfirm(IPTetCflStatNode* nodes,
     }
 }
 
-static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_current,
-        time_t *tv_scale, uint32_t *scale_cmb, uint8_t *scale_reset, uint32_t scale_flag)
+static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, uint16_t sock_idx,
+        time_t tvs_current, time_t *tv_scale, uint32_t *scale_cmb,
+        uint8_t *scale_reset, uint32_t scale_flag)
 {
     uint8_t pflag_idx, scl_idx;
     int ret = 0, tvs_upd_gap;
     uint32_t i, j, node_cfm_start;
-    uint32_t new_node = 0, upd_count = 0, pp_count = 0, count_sum, count_sum_pre = 0;
+    uint32_t new_node = 0, upd_count = 0, expire_cnt = 0, geo_scl = 0, pp_count = 0, pp_scl = 0;
+    uint32_t count_sum, count_sum_pre = 0;
     uint32_t protp_cnt_in, protp_bsz_in, protp_cnt_out, protp_bsz_out;
-    uint64_t id;
+    uint64_t id, node_cnt;
     uint64_t ppflag_ora[NF_IPTET_PFLAG_NUM], ppnflag;
-    const char *pp_scale_query;
+    const char *scale_query;
     //ProtoProtKeyDbUnion ipt_ppu;
-    IPTetCflStatNode* tnode = sfdp_ctl->tnode.nodes;
+    IPTetCflStatNode* tnode = sfdp_ctl->tnode[sock_idx].nodes;
     ProtoPortCflNode *ppnode;
 
-    LogMessage("%s: handle iptet, cur_idx %d\n", __func__, sfdp_ctl->tnode.npidx);
+    LogMessage("%s: handle iptet, cur_idx %d\n", __func__, sfdp_ctl->tnode[sock_idx].npidx);
+
+    mn_MysqlTransBegin(sf_mysql);
+    for ( scl_idx=SF_SCALE_STAGE_MIN; scl_idx<SF_SCALE_STAGE_SAVE; scl_idx++ ) {
+        if ( ((0x01<<scl_idx) & scale_flag) && scale_reset[scl_idx] ) {
+            snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), geo_scale_reset_cmb,
+                        scale_cmb_geo_table_name[scl_idx-1], scale_cmb[scl_idx]);
+            ret = mn_MysqlQuery(sf_mysql, sql_cfl_scl, NULL);
+        }
+    }
+
+    for ( scl_idx=SF_SCALE_STAGE_DAY; scl_idx<SF_SCALE_STAGE_MAX; scl_idx++ ) {
+        if ( ((0x01<<scl_idx) & scale_flag) && scale_reset[scl_idx] ) {
+            snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), geo_scale_reset_cmb,
+                        scale_cmb_geo_table_name[scl_idx-1], scale_cmb[scl_idx]);
+            ret = mn_MysqlQuery(sf_mysql, sql_cfl_scl, NULL);
+        }
+    }
+    mn_MysqlTransCommit(sf_mysql);
 
     mn_MysqlTransBegin(sf_mysql);
 
     //for(i = 0; i < sfdp_ctl->tnode.npidx; i++, tnode++) {
     node_cfm_start = 0;
-    for (i=0; i<MAX_IPTET_CONFLUENCE_NODE_SZ; i++, tnode++) {
+    node_cnt = sfdp_ctl->tnode[sock_idx].total;
+    for (i=0; i<node_cnt; i++, tnode++) {
         if ( NF_NODEIPT_NON == tnode->fsm || NF_NODEIPT_IDLE == tnode->fsm )
             continue;
         else if ( NF_NODEIPT_SYNCED == tnode->fsm
-                && (tnode->qry_flag&NF_IPTET_ALM_FLAG) ) {
+                && (tnode->qry_flag&NF_IPTET_DEDICATE_FLAG) ) {
             tnode->fsm = NF_NODEIPT_UPD;
-            LogMessage("%s: sync iptet(id %lu) for new alysist's alarms\n", __func__, tnode->dbid);
+            //LogMessage("%s: sync iptet(id %lu) for new alysist's alarms\n", __func__, tnode->dbid);
         }
 
         //pp-node for ppflag
@@ -861,9 +942,10 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
             id = 0;
             snprintf(sql_cfl, sizeof(sql_cfl), ipt_insert,
                     map_nf2dbtbl[NF_IPTET].tbl_name,
-                    tnode->hsum, tnode->tet.src, tnode->tet.dst, tnode->direction,
+                    tnode->sf_sta, tnode->tet.src, tnode->tet.dst, tnode->geo_index, tnode->direction,
                     tnode->tv_upd/*tv_start*/, tnode->tv_upd,
-                    tnode->cnt+0L, tnode->bsize+0L, tnode->syn+0L, tnode->dns+0L,
+                    tnode->scl_st[SF_SCALE_STAGE_META].cnt+0L, tnode->scl_st[SF_SCALE_STAGE_META].bsz+0L,
+                    tnode->syn+0L, tnode->dns+0L,
                     ppflag_ora[0], ppflag_ora[1], ppflag_ora[2], ppflag_ora[3], ppflag_ora[4], tnode->almflag);
             ret = mn_MysqlQueryUlid(sf_mysql, sql_cfl, &id);
             if ( ret )
@@ -880,24 +962,27 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
             if ( tnode->qry_flag&NF_IPTET_FLOW_DATA ) {
                 snprintf(sql_cfl, sizeof(sql_cfl), ipt_update,
                         map_nf2dbtbl[NF_IPTET].tbl_name,
-                        tnode->direction, tnode->tv_upd,
-                        tnode->cnt+0L, tnode->bsize+0L, tnode->syn+0L, tnode->dns+0L,
+                        tnode->sf_sta, tnode->geo_index, tnode->direction, tnode->tv_upd,
+                        tnode->scl_st[SF_SCALE_STAGE_META].cnt+0L, tnode->scl_st[SF_SCALE_STAGE_META].bsz+0L,
+                        tnode->syn+0L, tnode->dns+0L,
                         ppflag_ora[0], ppflag_ora[1], ppflag_ora[2], ppflag_ora[3], ppflag_ora[4], tnode->almflag, tnode->dbid);
                 ret = mn_MysqlQuery(sf_mysql, sql_cfl, NULL);
                 if ( ret )
                     break;
 
-                tnode->qry_flag |= NF_IPTET_FLOW_DATA_QNC|NF_IPTET_ALM_FLAG_QNC;
+                tnode->qry_flag |= NF_IPTET_FLOW_DATA_QNC|NF_IPTET_DEDICATE_FLAG_QNC;
                 tnode->fsm = NF_NODEIPT_UPD_TOBE_CFM;
             }
-            else if ( tnode->qry_flag&NF_IPTET_ALM_FLAG ) {         //Just alarm flag
+            else if ( tnode->qry_flag&NF_IPTET_DEDICATE_FLAG ) {         //Just alarm flag
                 snprintf(sql_cfl, sizeof(sql_cfl), ipt_upd_almflag,
-                        map_nf2dbtbl[NF_IPTET].tbl_name, tnode->almflag, tnode->dbid);
+                        map_nf2dbtbl[NF_IPTET].tbl_name,
+                        tnode->sf_sta, tnode->geo_index,
+                        tnode->almflag, tnode->dbid);
                 ret = mn_MysqlQuery(sf_mysql, sql_cfl, NULL);
                 if ( ret )
                     break;
 
-                tnode->qry_flag |= NF_IPTET_ALM_FLAG_QNC;
+                tnode->qry_flag |= NF_IPTET_DEDICATE_FLAG_QNC;
                 tnode->fsm = NF_NODEIPT_UPD_TOBE_CFM;
             }
 
@@ -908,7 +993,7 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
             //Node Activation
             if ( tnode->expire ) {
                 //remove from database
-                snprintf(sql_cfl, sizeof(sql_cfl), ipt_delete,
+                /*snprintf(sql_cfl, sizeof(sql_cfl), ipt_delete,
                         map_nf2dbtbl[NF_IPTET].tbl_name, tnode->dbid);
                 ret = mn_MysqlQuery(sf_mysql, sql_cfl, NULL);
                 if ( ret )
@@ -918,21 +1003,27 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
                         map_nf2dbtbl[NF_PROTP].tbl_name, tnode->dbid);
                 ret = mn_MysqlQuery(sf_mysql, sql_cfl, NULL);
                 if ( ret )
+                    break;*/
+
+                snprintf(sql_cfl, sizeof(sql_cfl), nfstats_del_ins_gb, tnode->dbid);
+                ret = mn_MysqlQuery(sf_mysql, sql_cfl, NULL);
+                if ( ret )
                     break;
 
-                //LogMessage("%s: ip tuple(id %d) expired\n", __func__, tnode->dbid);
-                mn_MysqlTransCommit(sf_mysql);
+                LogMessage("%s: ip tuple(id %lu) expired\n", __func__, tnode->dbid);
+                /*mn_MysqlTransCommit(sf_mysql);
                 mn_MysqlTransBegin(sf_mysql);
-                sf_IptetSyncDBConfirm(sfdp_ctl->tnode.nodes, node_cfm_start, i, scale_flag);
+                sf_IptetSyncDBConfirm(sfdp_ctl->tnode[sock_idx].nodes, node_cfm_start, i, scale_flag);
                 node_cfm_start = i+1;
 
                 //also remove node which didn't update for a long time
-                JHashIpTetCflDel(sfdp_ctl->h_tnode.hatbl, &sfdp_ctl->tnode,
-                        &tnode->tet, tnode->dbid);
+                JHashIpTetCflDel(&sfdp_ctl->h_tnode[sock_idx], &sfdp_ctl->tnode[sock_idx],
+                        &tnode->tet, tnode->dbid, (sfdp_ctl->nsock-1));*/
+                expire_cnt++;
             }
             else {
                 tvs_upd_gap = tvs_current - tnode->tv_upd;
-                if ( tvs_upd_gap > 300 ) {   //haven't update in the last five minutes
+                if ( tvs_upd_gap > 86400 ) {   //haven't update in the last 24 hours
                     tnode->aly_stat &= ~SFALY_IPT_ACTIVE;
                     tnode->aly_stat |= SFALY_IPT_INSPECT_PULSE;
                 }
@@ -943,6 +1034,69 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
         //finish this ip_tet node
         if ( ret )
             break;
+
+        //Scaled IPTET-GEO Data--Sync to DB
+        if ( tnode->geo_index > 0 ) {
+            for ( scl_idx=SF_SCALE_STAGE_MIN; scl_idx<SF_SCALE_STAGE_SAVE; scl_idx++ ) {
+                tnode->scl_st[scl_idx].cnt += tnode->scl_st[SF_SCALE_STAGE_META].cnt;
+                tnode->scl_st[scl_idx].bsz += tnode->scl_st[SF_SCALE_STAGE_META].bsz;
+
+                if ( ((0x01<<scl_idx) & scale_flag) && (tnode->scl_st[scl_idx].cnt>0) ) {
+                    /*if ( scale_reset[scl_idx] )
+                        scale_query = geo_scale_throw;
+                    else*/
+                        scale_query = geo_scale_add;
+
+                    if ( SF_STREAM_UP == tnode->direction ) {
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_geo_table_name[scl_idx-1], tnode->geo_index,
+                                scale_cmb[scl_idx], tv_scale[scl_idx],
+                                tnode->scl_st[scl_idx].cnt, tnode->scl_st[scl_idx].bsz, 0, 0);
+                    }
+                    else {
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_geo_table_name[scl_idx-1], tnode->geo_index,
+                                scale_cmb[scl_idx], tv_scale[scl_idx],
+                                0, 0, tnode->scl_st[scl_idx].cnt, tnode->scl_st[scl_idx].bsz);
+                    }
+                    ret = mn_MysqlQuery(sf_mysql, sql_cfl_scl, NULL);
+                    if ( ret )
+                        break;
+
+                    geo_scl++;
+                }
+            }
+
+            for ( scl_idx=SF_SCALE_STAGE_DAY; scl_idx<SF_SCALE_STAGE_MAX; scl_idx++ ) {
+                if ( ((0x01<<scl_idx) & scale_flag) && (tnode->scl_st[SF_SCALE_STAGE_HOUR].cnt>0) ) {
+                    /*if ( scale_reset[scl_idx] )
+                        scale_query = geo_scale_throw;
+                    else*/
+                        scale_query = geo_scale_add;
+
+                    if ( SF_STREAM_UP == tnode->direction ) {
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_geo_table_name[scl_idx-1], tnode->geo_index,
+                                scale_cmb[scl_idx], tv_scale[scl_idx],
+                                tnode->scl_st[SF_SCALE_STAGE_HOUR].cnt,
+                                tnode->scl_st[SF_SCALE_STAGE_HOUR].bsz, 0, 0);
+                    }
+                    else {
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_geo_table_name[scl_idx-1], tnode->geo_index,
+                                scale_cmb[scl_idx], tv_scale[scl_idx],
+                                0, 0,
+                                tnode->scl_st[SF_SCALE_STAGE_HOUR].cnt,
+                                tnode->scl_st[SF_SCALE_STAGE_HOUR].bsz);
+                    }
+                    ret = mn_MysqlQuery(sf_mysql, sql_cfl_scl, NULL);
+                    if ( ret )
+                        break;
+
+                    geo_scl++;
+                }
+            }
+        }
 
         ppnode = tnode->pp_node;
         while ( ppnode ) {
@@ -957,16 +1111,16 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
                 if ( (PORT_VEC_IN == ppnode->nk.port_vec)
                         || (PORT_VEC_INVALID == ppnode->nk.port_vec
                                 && SF_STREAM_UP == tnode->direction) ) {    //Default, internal side to outer-side-port
-                    protp_cnt_in = ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].cnt;
-                    protp_bsz_in = ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].bsz;
+                    protp_cnt_in = ppnode->scl_st[SF_SCALE_STAGE_META].cnt;
+                    protp_bsz_in = ppnode->scl_st[SF_SCALE_STAGE_META].bsz;
                     protp_cnt_out = 0;
                     protp_bsz_out = 0;
                 }
                 else {
                     protp_cnt_in = 0;
                     protp_bsz_in = 0;
-                    protp_cnt_out = ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].cnt;
-                    protp_bsz_out = ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].bsz;
+                    protp_cnt_out = ppnode->scl_st[SF_SCALE_STAGE_META].cnt;
+                    protp_bsz_out = ppnode->scl_st[SF_SCALE_STAGE_META].bsz;
                 }
 
                 if ( ppnflag ) {
@@ -990,7 +1144,7 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
                     if ( ret )
                         break;
 
-                    if ( SF_GLOB_VAR_PP_SCALE_L0 != scale_flag ) {   //Not just meta-prot_p-data
+                    if ( SF_GLOB_VAR_SCALE_L0 != (SF_GLOB_VAR_SCALE_MASK&scale_flag) ) {   //Not just meta-prot_p-data
                         ret = mn_MysqlQuery(sf_mysql, protp_set_pp_id, NULL);
                         if ( ret )
                             break;
@@ -999,71 +1153,71 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
             //}
 
             //Scaled Data--Sync to DB
-            for ( scl_idx=SF_PROTP_SCALE_STAGE_MIN; scl_idx<SF_PROTP_SCALE_STAGE_SAVE; scl_idx++ ) {
-                ppnode->scl_st[scl_idx].cnt += ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].cnt;
-                ppnode->scl_st[scl_idx].bsz += ppnode->scl_st[SF_PROTP_SCALE_STAGE_META].bsz;
+            for ( scl_idx=SF_SCALE_STAGE_MIN; scl_idx<SF_SCALE_STAGE_SAVE; scl_idx++ ) {
+                ppnode->scl_st[scl_idx].cnt += ppnode->scl_st[SF_SCALE_STAGE_META].cnt;
+                ppnode->scl_st[scl_idx].bsz += ppnode->scl_st[SF_SCALE_STAGE_META].bsz;
 
                 if ( (0x01<<scl_idx) & scale_flag ) {
                     if ( scale_reset[scl_idx] )
-                        pp_scale_query = protp_scale_throw;
+                        scale_query = protp_scale_throw;
                     else
-                        pp_scale_query = protp_scale_add;
+                        scale_query = protp_scale_add;
 
                     if ( (PORT_VEC_IN == ppnode->nk.port_vec)
                             || (PORT_VEC_INVALID == ppnode->nk.port_vec
                                     && SF_STREAM_UP == tnode->direction) ) {
-                        snprintf(sql_cfl_pp_scl, sizeof(sql_cfl_pp_scl), pp_scale_query,
-                                scale_cmb_table_name[scl_idx-1],
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_protp_table_name[scl_idx-1], tnode->dbid, tnode->geo_index,
                                 scale_cmb[scl_idx], tv_scale[scl_idx],
                                 ppnode->scl_st[scl_idx].cnt, ppnode->scl_st[scl_idx].bsz, 0, 0,
                                 tnode->direction);
                     }
                     else {
-                        snprintf(sql_cfl_pp_scl, sizeof(sql_cfl_pp_scl), pp_scale_query,
-                                scale_cmb_table_name[scl_idx-1],
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_protp_table_name[scl_idx-1], tnode->dbid, tnode->geo_index,
                                 scale_cmb[scl_idx], tv_scale[scl_idx],
                                 0, 0, ppnode->scl_st[scl_idx].cnt, ppnode->scl_st[scl_idx].bsz,
                                 tnode->direction);
                     }
-                    ret = mn_MysqlQuery(sf_mysql, sql_cfl_pp_scl, NULL);
+                    ret = mn_MysqlQuery(sf_mysql, sql_cfl_scl, NULL);
                     if ( ret )
                         break;
 
-                    pp_count+=1;
+                    pp_scl++;
                 }
             }
 
-            for ( scl_idx=SF_PROTP_SCALE_STAGE_DAY; scl_idx<SF_PROTP_SCALE_STAGE_MAX; scl_idx++ ) {
+            for ( scl_idx=SF_SCALE_STAGE_DAY; scl_idx<SF_SCALE_STAGE_MAX; scl_idx++ ) {
                 if ( (0x01<<scl_idx) & scale_flag ) {
                     if ( scale_reset[scl_idx] )
-                        pp_scale_query = protp_scale_throw;
+                        scale_query = protp_scale_throw;
                     else
-                        pp_scale_query = protp_scale_add;
+                        scale_query = protp_scale_add;
 
                     if ( (PORT_VEC_IN == ppnode->nk.port_vec)
                             || (PORT_VEC_INVALID == ppnode->nk.port_vec
                                     && SF_STREAM_UP == tnode->direction) ) {
-                        snprintf(sql_cfl_pp_scl, sizeof(sql_cfl_pp_scl), pp_scale_query,
-                                scale_cmb_table_name[scl_idx-1],
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_protp_table_name[scl_idx-1], tnode->dbid, tnode->geo_index,
                                 scale_cmb[scl_idx], tv_scale[scl_idx],
-                                ppnode->scl_st[SF_PROTP_SCALE_STAGE_HOUR].cnt,
-                                ppnode->scl_st[SF_PROTP_SCALE_STAGE_HOUR].bsz, 0, 0,
+                                ppnode->scl_st[SF_SCALE_STAGE_HOUR].cnt,
+                                ppnode->scl_st[SF_SCALE_STAGE_HOUR].bsz, 0, 0,
                                 tnode->direction);
                     }
                     else {
-                        snprintf(sql_cfl_pp_scl, sizeof(sql_cfl_pp_scl), pp_scale_query,
-                                scale_cmb_table_name[scl_idx-1],
+                        snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), scale_query,
+                                scale_cmb_protp_table_name[scl_idx-1], tnode->dbid, tnode->geo_index,
                                 scale_cmb[scl_idx], tv_scale[scl_idx],
                                 0, 0,
-                                ppnode->scl_st[SF_PROTP_SCALE_STAGE_HOUR].cnt,
-                                ppnode->scl_st[SF_PROTP_SCALE_STAGE_HOUR].bsz,
+                                ppnode->scl_st[SF_SCALE_STAGE_HOUR].cnt,
+                                ppnode->scl_st[SF_SCALE_STAGE_HOUR].bsz,
                                 tnode->direction);
                     }
-                    ret = mn_MysqlQuery(sf_mysql, sql_cfl_pp_scl, NULL);
+                    ret = mn_MysqlQuery(sf_mysql, sql_cfl_scl, NULL);
                     if ( ret )
                         break;
 
-                    pp_count+=1;
+                    pp_scl++;
                 }
             }
 
@@ -1081,13 +1235,14 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
             break;
 
         //sql transaction
-        count_sum = new_node+upd_count+pp_count;
+        count_sum = new_node+upd_count+(expire_cnt<<8)+pp_count+geo_scl+pp_scl;
         if ( (count_sum-count_sum_pre) > 0xfff ) {
             count_sum_pre = count_sum;
 
             mn_MysqlTransCommit(sf_mysql);
             mn_MysqlTransBegin(sf_mysql);
-            sf_IptetSyncDBConfirm(sfdp_ctl->tnode.nodes, node_cfm_start, i, scale_flag);
+            sf_IptetSyncDBConfirm(&sfdp_ctl->h_tnode[sock_idx], &sfdp_ctl->tnode[sock_idx],
+                    node_cfm_start, i, scale_flag);
             node_cfm_start = i+1;
         }
     }
@@ -1095,7 +1250,7 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
     if ( ret ) {            //Query Failed
         mn_MysqlTransRollback(sf_mysql);
 
-        tnode = sfdp_ctl->tnode.nodes+node_cfm_start;
+        tnode = sfdp_ctl->tnode[sock_idx].nodes+node_cfm_start;
         LogMessage("%s: Rollback, node_start %d, node_end %d\n", __func__, node_cfm_start, i);
         for (j=node_cfm_start; j<=i; j++, tnode++) {
             switch ( tnode->fsm ) {
@@ -1106,8 +1261,8 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
                 tnode->fsm = NF_NODEIPT_UPD;
                 if ( tnode->qry_flag&NF_IPTET_FLOW_DATA_QNC )
                     tnode->qry_flag &= ~NF_IPTET_FLOW_DATA_QNC;
-                if ( tnode->qry_flag&NF_IPTET_ALM_FLAG_QNC )
-                    tnode->qry_flag &= ~NF_IPTET_ALM_FLAG_QNC;
+                if ( tnode->qry_flag&NF_IPTET_DEDICATE_FLAG_QNC )
+                    tnode->qry_flag &= ~NF_IPTET_DEDICATE_FLAG_QNC;
                 break;
             default:
                 break;
@@ -1118,21 +1273,24 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, time_t tvs_curre
     }
     else {                  //Query Succeed
         mn_MysqlTransCommit(sf_mysql);
-        sf_IptetSyncDBConfirm(sfdp_ctl->tnode.nodes, node_cfm_start,
-                MAX_IPTET_CONFLUENCE_NODE_SZ-1, scale_flag);
+        sf_IptetSyncDBConfirm(&sfdp_ctl->h_tnode[sock_idx], &sfdp_ctl->tnode[sock_idx],
+                node_cfm_start, node_cnt-1, scale_flag);
 
         //reset cfl_ssn node pool
         //sfdp_ctl->snode.npidx = 0;
-        if ( (sfGlobalInfo.envset_scl_flag & scale_flag) == sfGlobalInfo.envset_scl_flag ) {      //Ready to Go Next Round
-            LogMessage("%s: reset cfl-protp mbuf\n", __func__);
-            pp_count = sfdp_ctl->pnode.npidx;
-            sfdp_ctl->pnode.npidx = 0;
-            memset(sfdp_ctl->h_pnode.hatbl, 0, sizeof(sfdp_ctl->h_pnode));
+        if ( (sfGlobalInfo.envset_scl_flag & (SF_GLOB_VAR_SCALE_MASK&scale_flag)) == sfGlobalInfo.envset_scl_flag ) {      //Ready to Go Next Round
+            LogMessage("%s: reset cfl-protp mbuf, ha_len 0x%lx\n", __func__,
+                    sizeof(void*)*(sfdp_ctl->h_pnode[sock_idx].size));
+            pp_count = sfdp_ctl->pnode[sock_idx].npidx;
+            sfdp_ctl->pnode[sock_idx].npidx = 0;
+            memset(sfdp_ctl->h_pnode[sock_idx].hatbl, 0,
+                    sizeof(void*)*(sfdp_ctl->h_pnode[sock_idx].size));
         }
     }
 
-    LogMessage("%s: no clear count, nodes num %d, transfer nodes -- new(%d) upd(%d) pp(%d)\n", __func__,
-    		sfdp_ctl->tnode.npcnt, new_node, upd_count, pp_count);
+    LogMessage("%s: no clear count, nodes[%u] num %d, transfer nodes -- new(%u) upd(%u) exp(%u) geo_scl(%u) pp(%u) pp_scl(%u)\n", __func__,
+            sock_idx, sfdp_ctl->tnode[sock_idx].npcnt,
+            new_node, upd_count, expire_cnt, geo_scl, pp_count, pp_scl);
     return 0;
 }
 
@@ -1490,40 +1648,59 @@ static int sf_AlyUnsSend(int fd, void *data, int datalen, void *rbuf, int *rlen)
     return 0;
 }
 
-static int sf_DBInsAlyUns(int fd, uint32_t aly_type, uint64_t dbid, uint64_t *alarm_flag)
+static int sf_DBInsAlyUns(int fd, /*uint32_t aly_type, uint64_t dbid*/
+        SFAlySockSend *aly_data, uint64_t *aly_flag)
 {
     int aly_retlen, ret;
     char alarm_flag_str[32];
-    SFAlySockSend aly_data;
+    char *pstr_ret;
+/*    SFAlySockSend aly_data;
 
     aly_data.type = htonl(aly_type);
     aly_data.id_start = htonl(dbid);
-    aly_data.id_end = htonl(dbid);
+    aly_data.id_end = htonl(dbid);*/
 
     memset(alarm_flag_str, 0, sizeof(alarm_flag_str));
     aly_retlen = sizeof(alarm_flag_str);
 
-    ret = sf_AlyUnsSend(fd, &aly_data, sizeof(aly_data), alarm_flag_str, &aly_retlen);
+    ret = sf_AlyUnsSend(fd, aly_data, sizeof(SFAlySockSend), alarm_flag_str, &aly_retlen);
     if ( ret < 0 ) {
         return ret;
     }
 
-    *alarm_flag = strtoull(alarm_flag_str, NULL, 10);
-    //LogMessage("%s: aly_ret %lx, len %d\n", __func__, *alarm_flag, aly_retlen);
+    *aly_flag = strtoull(alarm_flag_str, NULL, 10);
+    pstr_ret = strchr(alarm_flag_str, ',');
+    if ( NULL != pstr_ret ) {
+        pstr_ret++;
+        *(aly_flag+1) = strtoull(pstr_ret, NULL, 10);
+    }
+    else {
+        *(aly_flag+1) = 0;
+    }
+
+    //LogMessage("%s: aly_ret %s, flag %lx, data_extra %lu, len %d\n", __func__,
+    //        alarm_flag_str, *aly_flag, *(aly_flag+1), aly_retlen);
 
     return 0;
 }
 
 int sf_DBIns_Loop(void *dp_cfl)
 {
+    uint8_t geo_map_step;
+    uint16_t sock_idx, sock_geo_idx;
     uint32_t sf_aly_type;
     int uns_fd, uns_ret;
     uint32_t ssn_hb_cnt = 0;
-    uint32_t ipt_idx;//, tvs_current, tvs_dbrec;
+    uint32_t ipt_idx, ipt_geo_idx;//, tvs_current, tvs_dbrec;
     StatsFlowConfluDataPlane *sf_dp_ctl = (StatsFlowConfluDataPlane*)dp_cfl;
     IPTetCflStatNode* tnode;
-    uint64_t alarm_flag;
+    IPTetCflStatNode* tnode_geo;
+    uint64_t ipt_proc_cnt, geo_map_proc_cnt;
+    uint32_t alarm_flag;
+    uint32_t aly_sta;
+    uint64_t sf_aly_flag[4];
     sigset_t sigset;
+    SFAlySockSend aly_data;
 
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGPIPE);
@@ -1535,7 +1712,12 @@ int sf_DBIns_Loop(void *dp_cfl)
     }
 
     LogMessage("%s: Start Inspection!\n", __func__);
+    sock_idx = 0;
+    sock_geo_idx = 0;
     ipt_idx = 0;
+    ipt_geo_idx = 0;
+    ipt_proc_cnt = 0;
+    geo_map_proc_cnt = 0;
     uns_ret = 0;
 
     do {
@@ -1548,15 +1730,89 @@ int sf_DBIns_Loop(void *dp_cfl)
 
             //Send cur max ssn_id
             LogMessage("%s: Aly Reconnected\n", __func__);
+            sfGlobalInfo.cur_iptid = 0;
             sfGlobalInfo.cur_ssnid = 0;
         }
 
+        //IpTet Geo map, 100
+        geo_map_step = 100;
+        //LogMessage("%s: step from %u.\n", __func__, ipt_geo_idx);
+        while(geo_map_step--) {
+            if ( geo_map_proc_cnt >= sf_dp_ctl->tnode[sock_geo_idx].npcnt ) {
+                ipt_geo_idx = 0;    //Step to Beginning
+                geo_map_proc_cnt = 0;
+                if ( sock_geo_idx < (sf_dp_ctl->nsock-1) )
+                    sock_geo_idx = sock_geo_idx + 1;
+                else
+                    sock_geo_idx = 0;
+            }
+
+            if ( 0 == ipt_geo_idx )
+                tnode_geo = sf_dp_ctl->tnode[sock_geo_idx].nodes;
+            else
+                tnode_geo++;
+            //ipt_geo_idx = (ipt_geo_idx+1)&IPTET_CONFLUENCE_NODE_SZ_MASK;
+            if ( ipt_geo_idx < (sf_dp_ctl->tnode[sock_geo_idx].total-1) )
+                ipt_geo_idx = ipt_geo_idx + 1;
+            else
+                ipt_geo_idx = 0;
+
+            //Count Nodes
+            geo_map_proc_cnt++;
+
+            if ( !tnode_geo->dbid )
+                continue;
+
+            if ( !tnode_geo->expire
+                    && (tnode_geo->sf_sta & SFALY_STA_FLAG_GEO) )
+                continue;
+
+            aly_data.type = htonl(SF_ALY_GEO_MAP);
+            aly_data.pad[0] = htonl(tnode_geo->sf_sta);
+            aly_data.id_1 = htonl(tnode_geo->dbid);
+            aly_data.id_2 = htonl(tnode_geo->dbid);
+            uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
+            if ( uns_ret < 0 ) {
+                LogMessage("%s: Aly(IPT-GEO) communication failed\n", __func__);
+                sf_DBIns_Closet(&uns_fd);
+                break;
+            }
+
+            //Handling Analyst State
+            aly_sta = (uint32_t)((sf_aly_flag[0] >> 32) & SFALY_STA_MASK);
+            if ( (aly_sta>0) && ((aly_sta^tnode_geo->sf_sta)&~tnode_geo->sf_sta) ) {
+                /*LogMessage("%s: new sf_sta for ipt(id %lu)--0x%lx(ori-0x%x)\n", __func__,
+                        tnode->dbid, aly_sta, tnode->sf_sta);*/
+                tnode_geo->sf_sta |= (aly_sta&SFALY_STA_MASK);
+                tnode_geo->geo_index = (uint64_t)sf_aly_flag[1];
+                tnode_geo->qry_flag |= NF_IPTET_DEDICATE_FLAG;
+            }
+
+            ssn_hb_cnt += 5;
+        }
+
         //IP Tuple Inspection: Get Node
+        if ( ipt_proc_cnt >= sf_dp_ctl->tnode[sock_idx].npcnt ) {
+            ipt_idx = 0;    //Step to next numa node' mbuf
+            ipt_proc_cnt = 0;
+            if ( sock_idx < (sf_dp_ctl->nsock-1) )
+                sock_idx = sock_idx + 1;
+            else
+                sock_idx = 0;
+        }
+
         if ( 0 == ipt_idx )
-            tnode = sf_dp_ctl->tnode.nodes;
+            tnode = sf_dp_ctl->tnode[sock_idx].nodes;
         else
             tnode++;
-        ipt_idx = (ipt_idx+1)&IPTET_CONFLUENCE_NODE_SZ_MASK;
+        //ipt_idx = (ipt_idx+1)&IPTET_CONFLUENCE_NODE_SZ_MASK;
+        if ( ipt_idx < (sf_dp_ctl->tnode[sock_idx].total-1) )
+            ipt_idx = ipt_idx + 1;
+        else
+            ipt_idx = 0;
+
+        //Count Nodes
+        ipt_proc_cnt++;
 
         //release CPU for distributing resource
         if ( (ipt_idx & 0xffff) == 0xffff ) {
@@ -1574,13 +1830,19 @@ int sf_DBIns_Loop(void *dp_cfl)
             else
                 sf_aly_type = SF_ALY_IP_TUPLE;
 
-            uns_ret = sf_DBInsAlyUns(uns_fd, sf_aly_type, tnode->dbid, &alarm_flag);
+            aly_data.type = htonl(sf_aly_type);
+            aly_data.pad[0] = htonl(tnode->sf_sta);
+            aly_data.id_1 = htonl(tnode->dbid);
+            aly_data.id_2 = htonl(tnode->dbid);
+            uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
             if ( uns_ret < 0 ) {
                 LogMessage("%s: Aly(IPT) communication failed\n", __func__);
                 sf_DBIns_Closet(&uns_fd);
                 continue;
             }
 
+            //Handling Alarm Flag
+            alarm_flag = (uint32_t)(sf_aly_flag[0] & SFALY_ALARM_MASK);
             if ( alarm_flag&SFALY_ALARM_IPT_EXPIRE ) {
                 tnode->expire = 1;
                 //LogMessage("%s: iptet(id-%d) expired, remove from tracking list.\n", __func__, ipt_dbid);
@@ -1589,7 +1851,7 @@ int sf_DBIns_Loop(void *dp_cfl)
                 LogMessage("%s: new alarms for ipt(id %lu)--0x%lx(ori-0x%x)\n", __func__,
                         tnode->dbid, alarm_flag, tnode->almflag);
                 tnode->almflag |= (alarm_flag&SFALY_ALARM_MASK);
-                tnode->qry_flag |= NF_IPTET_ALM_FLAG;
+                tnode->qry_flag |= NF_IPTET_DEDICATE_FLAG;
             }
 
             tnode->aly_stat &= ~SFALY_IPT_INSPECT_PULSE;
@@ -1597,20 +1859,29 @@ int sf_DBIns_Loop(void *dp_cfl)
         }
 
         //Session Inspection
-        if ( sfGlobalInfo.cur_ssnid < sfGlobalInfo.max_ssnid ) {
-            uns_ret = sf_DBInsAlyUns(uns_fd, SF_ALY_PROTO_SESSION, sfGlobalInfo.max_ssnid, &alarm_flag);
+        if ( (sfGlobalInfo.cur_iptid < sfGlobalInfo.max_iptid)
+                || (sfGlobalInfo.cur_ssnid < sfGlobalInfo.max_ssnid) ) {
+            aly_data.type = htonl(SF_ALY_PROTO_SESSION);
+            aly_data.id_1 = htonl(sfGlobalInfo.max_iptid);
+            aly_data.id_2 = htonl(sfGlobalInfo.max_ssnid);
+            uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
             if ( uns_ret < 0 ) {
                 LogMessage("%s: Aly(SSN) communication failed\n", __func__);
                 sf_DBIns_Closet(&uns_fd);
                 continue;
             }
+            sfGlobalInfo.cur_iptid = sfGlobalInfo.max_iptid;
             sfGlobalInfo.cur_ssnid = sfGlobalInfo.max_ssnid;
 
             ssn_hb_cnt = 0;
         }
         else if ( ssn_hb_cnt++ & 0x1000000 ) {  //Heart Beat, as ssn
             ssn_hb_cnt = 0;
-            uns_ret = sf_DBInsAlyUns(uns_fd, SF_ALY_PROTO_SESSION, sfGlobalInfo.max_ssnid, &alarm_flag);
+
+            aly_data.type = htonl(SF_ALY_PROTO_SESSION);
+            aly_data.id_1 = htonl(sfGlobalInfo.max_iptid);
+            aly_data.id_2 = htonl(sfGlobalInfo.max_ssnid);
+            uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
             if ( uns_ret < 0 ) {
                 LogMessage("%s: Aly(SSN) communication failed\n", __func__);
                 sf_DBIns_Closet(&uns_fd);
@@ -1648,13 +1919,51 @@ int sf_DBIns_Loop(void *dp_cfl)
     return 0;
 }
 
-int sf_CflInit(void *dp_cfl)
+int sf_CflInit(void *dp_cfl, uint16_t rsock, uint16_t nsock)
 {
+	uint16_t i;
 	int stack_i, nmap_idx;
 	ProtoStackStatsCflNodes *pnode;
 	StatsFlowConfluDataPlane *sf_dp_ctl = (StatsFlowConfluDataPlane*)dp_cfl;
+	DataplaneAddrs sf_dp_addrs;
 
-	LogMessage("%s: dp_cfl %lx\n", __func__, (unsigned long)dp_cfl);
+	LogMessage("%s: dp_cfl %lx, nsock %u\n", __func__,
+	        (unsigned long)dp_cfl, nsock);
+
+    sf_dp_ctl->nsock = nsock;
+    for (i=0; i<nsock; i++) {
+        sf_dp_addrs.sock_id = i&(rsock-1);
+
+	    //IP-TET
+        if ( 0 != mn_daq_get_mbuf((void*)&sf_dp_addrs, MPOOL_SF_CFL_IPT_HA) )
+            return -1;
+        sf_dp_ctl->h_tnode[i].hatbl = (IPTetCflStatNode**)sf_dp_addrs.dp_main;
+        sf_dp_ctl->h_tnode[i].size = MAX_IPTET_CONFLUENCE_HASHSZ;
+        LogMessage("%s: h_tnode 0x%lx, size %lu\n", __func__,
+                (unsigned long)sf_dp_ctl->h_tnode[i].hatbl, sf_dp_ctl->h_tnode[i].size);
+
+        if ( 0 != mn_daq_get_mbuf((void*)&sf_dp_addrs, MPOOL_SF_CFL_IPTET) )
+            return -1;
+        sf_dp_ctl->tnode[i].nodes = (IPTetCflStatNode*)sf_dp_addrs.dp_main;
+        sf_dp_ctl->tnode[i].total = MAX_IPTET_CONFLUENCE_NODE_SZ;
+        LogMessage("%s: tnode %lx, total %lu\n", __func__,
+                (unsigned long)sf_dp_ctl->tnode[i].nodes, sf_dp_ctl->tnode[i].total);
+
+        //PROTP
+        if ( 0 != mn_daq_get_mbuf((void*)&sf_dp_addrs, MPOOL_SF_CFL_PP_HA) )
+            return -1;
+        sf_dp_ctl->h_pnode[i].hatbl = (ProtoPortCflNode**)sf_dp_addrs.dp_main;
+        sf_dp_ctl->h_pnode[i].size = MAX_PROTOPORT_CFL_HASHSZ;
+        LogMessage("%s: h_pnode %lx, size %lu\n", __func__,
+                (unsigned long)sf_dp_ctl->h_pnode[i].hatbl, sf_dp_ctl->h_pnode[i].size);
+
+        if ( 0 != mn_daq_get_mbuf((void*)&sf_dp_addrs, MPOOL_SF_CFL_PROTP) )
+            return -1;
+        sf_dp_ctl->pnode[i].nodes = (ProtoPortCflNode*)sf_dp_addrs.dp_main;
+        sf_dp_ctl->pnode[i].total = MAX_PROTOPORT_CFL_NODE_SZ;
+        LogMessage("%s: pnode %lx, size %lu\n", __func__,
+                (unsigned long)sf_dp_ctl->pnode[i].nodes, sf_dp_ctl->pnode[i].total);
+    }
 
     if ( mn_MysqlConnect(&sf_mysql, server, database, user, password) ) {
         sf_mysql = NULL;
@@ -1716,9 +2025,11 @@ int sf_CflInit(void *dp_cfl)
     return 0;
 }
 
-int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
+int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uint8_t db_sync)
 {
+    uint16_t sock_i;
     int ret_val = 0, db_ret = 0;
+    StatsFlowConfluDataPlane *sf_dp_ctl = (StatsFlowConfluDataPlane*)dp_cfl;
 
     /*LogMessage("%s: dp_cfl %lx, merge dp %lx\n", __func__,
             (unsigned long)dp_cfl, (unsigned long)dp);*/
@@ -1731,10 +2042,10 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
 
         if ( db_sync ) {    //sync ip_tet
             uint8_t scale_layer;
-            uint8_t scale_reset[SF_PROTP_SCALE_STAGE_MAX] = {0};
+            uint8_t scale_reset[SF_SCALE_STAGE_MAX] = {0};
             uint32_t scale_flag;
-            uint32_t scale_cmb[SF_PROTP_SCALE_STAGE_MAX] = {0};
-            time_t tv_cur = time(NULL), tv_scale[SF_PROTP_SCALE_STAGE_MAX];
+            uint32_t scale_cmb[SF_SCALE_STAGE_MAX] = {0};
+            time_t tv_cur = time(NULL), tv_scale[SF_SCALE_STAGE_MAX];
             struct tm ipt_tm_date, scl_tm_date;
             char scale_pr_buf[256] = {0}, buf[32];
 
@@ -1748,21 +2059,21 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
             }
 
             //Meta Stock
-            scale_layer = SF_PROTP_SCALE_STAGE_META;
+            scale_layer = SF_SCALE_STAGE_META;
             tv_scale[scale_layer] = tv_cur;
             localtime_r(&tv_scale[scale_layer], &ipt_tm_date);
             scale_cmb[scale_layer] = 0;
-            scale_flag = SF_GLOB_VAR_PP_SCALE_L0;
+            scale_flag = SF_GLOB_VAR_SCALE_L0;
             scale_reset[scale_layer] = 0;
 
-            if ( (sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_PP_SCALE_DEEP_ALL)
+            if ( (sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_SCALE_DEEP_ALL)
                     && (ipt_tm_date.tm_sec < SUR_SF_IPT_PP_SCALE_BASE_TIME) ) {
-                if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_PP_SCALE_L1 ) {
-                    scale_layer = SF_PROTP_SCALE_STAGE_MIN;
+                if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_SCALE_L1 ) {
+                    scale_layer = SF_SCALE_STAGE_MIN;
                     tv_scale[scale_layer] = tv_cur - SUR_SF_IPT_PP_SCALE_VAL_MIN;  //step back
                     localtime_r(&tv_scale[scale_layer], &scl_tm_date);
                     scale_cmb[scale_layer] = ((scl_tm_date.tm_hour&0x07)<<8)|(scl_tm_date.tm_min);
-                    scale_flag |= SF_GLOB_VAR_PP_SCALE_L1;
+                    scale_flag |= SF_GLOB_VAR_SCALE_L1;
                     scale_reset[scale_layer] = 1;
 
                     LogMessage("%s: handle protp-scale, tm_hour %d, tm_min %d\n", __func__,
@@ -1779,17 +2090,18 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
 #endif
                     snprintf(scale_pr_buf, sizeof(scale_pr_buf), "scale_deep, ");
                     //Hour
-                    if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_PP_SCALE_L2 ) {
-                        scale_layer = SF_PROTP_SCALE_STAGE_HOUR;
+                    if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_SCALE_L2 ) {
+                        scale_layer = SF_SCALE_STAGE_HOUR;
                         //tv_scale[scale_layer] = tv_cur - SUR_SF_IPT_PP_SCALE_VAL_HOUR;  //step back
                         tv_scale[scale_layer] = tv_cur -                                                        \
                                 (ipt_tm_date.tm_sec +                                       /*seconds*/         \
                                  ipt_tm_date.tm_min*60);                                    /*minutes*/
-                        if ( 0 == ipt_tm_date.tm_min )
+                        if ( 0 == ipt_tm_date.tm_min ) {
                             tv_scale[scale_layer] -= SUR_SF_IPT_PP_SCALE_VAL_HOUR;              /*previous hour*/
+                        }
                         localtime_r(&tv_scale[scale_layer], &scl_tm_date);
                         scale_cmb[scale_layer] = (scl_tm_date.tm_mday*24+scl_tm_date.tm_hour)|(scale_layer-1)<<28;
-                        scale_flag |= SF_GLOB_VAR_PP_SCALE_L2;
+                        scale_flag |= SF_GLOB_VAR_SCALE_L2;
 #ifdef SCL_DEBUG
                         if ( SCL_DEBUG == ipt_tm_date.tm_min )
                             scale_reset[scale_layer] = 1;
@@ -1804,8 +2116,8 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
                     }
 
                     //Day
-                    if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_PP_SCALE_L3 ) {
-                        scale_layer = SF_PROTP_SCALE_STAGE_DAY;
+                    if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_SCALE_L3 ) {
+                        scale_layer = SF_SCALE_STAGE_DAY;
                         //tv_scale[scale_layer] = tv_cur - SUR_SF_IPT_PP_SCALE_VAL_DAY + 1;  //step back
                         tv_scale[scale_layer] = tv_cur - \
                                 (ipt_tm_date.tm_sec +                                       /*seconds*/ \
@@ -1816,7 +2128,7 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
                             tv_scale[scale_layer] -= SUR_SF_IPT_PP_SCALE_VAL_DAY;              /*previous day*/
                         localtime_r(&tv_scale[scale_layer], &scl_tm_date);
                         scale_cmb[scale_layer] = (scl_tm_date.tm_yday)|(scale_layer-1)<<28;
-                        scale_flag |= SF_GLOB_VAR_PP_SCALE_L3;
+                        scale_flag |= SF_GLOB_VAR_SCALE_L3;
                         if ( 1 == ipt_tm_date.tm_hour )
                             scale_reset[scale_layer] = 1;
                         else
@@ -1827,8 +2139,8 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
                     }
 
                     //Month
-                    if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_PP_SCALE_L4 ) {
-                        scale_layer = SF_PROTP_SCALE_STAGE_MONTH;
+                    if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_SCALE_L4 ) {
+                        scale_layer = SF_SCALE_STAGE_MONTH;
                         if ( (0 == ipt_tm_date.tm_min)
                                 && (0 == ipt_tm_date.tm_hour)
                                 && (1 == ipt_tm_date.tm_mday)) {
@@ -1847,7 +2159,7 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
                         }
                         localtime_r(&tv_scale[scale_layer], &scl_tm_date);
                         scale_cmb[scale_layer] = (scl_tm_date.tm_mon+1)|(scale_layer-1)<<28;
-                        scale_flag |= SF_GLOB_VAR_PP_SCALE_L4;
+                        scale_flag |= SF_GLOB_VAR_SCALE_L4;
                         if ( 1 == ipt_tm_date.tm_hour && 1 == ipt_tm_date.tm_mday )
                             scale_reset[scale_layer] = 1;
                         else
@@ -1860,12 +2172,16 @@ int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync)
                     LogMessage("%s: scale_flag 0x%x, %s\n", __func__, scale_flag, scale_pr_buf);
                 }
 
-                if ( 0 )//scale_flag & SF_GLOB_VAR_PP_SCALE_DEEP_ALL )
+                if ( 0 )//scale_flag & SF_GLOB_VAR_SCALE_DEEP_ALL )
                     ret_val = SUR_SF_IPT_PP_SCALE_SUM_CNT - 1;
 
-                if ( (scale_flag&SF_GLOB_VAR_PP_SCALE_DEEP_ALL)
-                        || (SCL_LIT_DEBUG == (SCL_LIT_DEBUG & ipt_tm_date.tm_min)))
-                    db_ret = sf_IptetSyncToDB(dp_cfl, tv_cur, tv_scale, scale_cmb, scale_reset, scale_flag);
+                if ( (scale_flag&SF_GLOB_VAR_SCALE_DEEP_ALL)
+                        || (SCL_LIT_DEBUG == (SCL_LIT_DEBUG & ipt_tm_date.tm_min))) {
+                    for (sock_i=0; sock_i<sf_dp_ctl->nsock; sock_i++) {
+                        db_ret = sf_IptetSyncToDB(dp_cfl, sock_i,
+                                tv_cur, tv_scale, scale_cmb, scale_reset, scale_flag);
+                    }
+                }
             }
 
             //sf_IptetSyncToDB(dp_cfl, tv_cur, tv_scale, scale_cmb, scale_reset, scale_flag);

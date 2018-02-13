@@ -5,12 +5,14 @@
 
 #include <syslog.h>
 #include <signal.h>
+#include <dirent.h>
 
 #include "mn_daq.h"
 #include "minerva.h"
 #include "statsifc.h"
 #include "mn_sf_cfl.h"
 #include "mn_gen.h"
+#include "mn_sf_sys_var.h"
 
 #include <rte_config.h>
 #include <rte_eal.h>
@@ -22,6 +24,31 @@
 
 static int exit_signal = 0;
 int mn_config_flag = 0;
+
+static int CheckNumaNodes(void)
+{
+   char filename[1024];
+   int  num_nodes = 0;
+   struct dirent *de;
+   DIR *dir;
+
+   snprintf(filename, sizeof(filename), "/sys/devices/system/node");
+
+   if ((dir = opendir(filename)))
+   {
+       while ((de = readdir(dir)))
+       {
+           if (strncmp(de->d_name, "node", 4) != 0)
+               continue;
+           num_nodes++;
+       }
+   }
+   closedir(dir);
+
+   LogMessage("minerva: Number of numa nodes is %d\n", num_nodes);
+
+   return num_nodes;
+}
 
 static void SigExitHandler(int signal)
 {
@@ -59,7 +86,7 @@ int main(int argc, char *argv[])
     uint8_t i, log_daemon = 0;
     uint8_t sur_c, numa_maps_c = 0;
     uint64_t pkt_count = 0, pkts_prev = 0;
-    uint64_t lcore_utl = 0;
+    uint64_t lcore_utl = 0, numa_node_c = 0;
     struct rte_ring *pkt_mbuf_ring;
     struct rte_mbuf *pkt_mp;
     struct timespec t_elapse;
@@ -93,6 +120,11 @@ int main(int argc, char *argv[])
             if ( i<argc )
                 lcore_utl = strtoul(argv[i], NULL, 16);
             break;
+        case 'N':
+            i++;
+            if ( i<argc )
+                numa_node_c = strtoul(argv[i], NULL, 10);
+            break;
         case 'M':
             log_daemon = 1;
             break;
@@ -102,13 +134,13 @@ int main(int argc, char *argv[])
                 strncpy(intf, argv[i], sizeof(intf)-1);
             break;
         default:
-            LogMessage("%s: Invalid parameter '%c'\n", prog_name, *(p_arg+1));
+            syslog(LOG_NOTICE, "%s: Invalid parameter '%c'\n", prog_name, *(p_arg+1));
             break;
         }
     }
 
     if ( 0 == lcore[0] || 0 == intf[0] ) {
-        LogMessage("%s: No valid core-mask or interface\n", prog_name);
+        syslog(LOG_NOTICE, "%s: No valid core-mask or interface\n", prog_name);
         return -1;
     }
 
@@ -129,11 +161,24 @@ int main(int argc, char *argv[])
 //    t_elapse.tv_sec = 0;
 //    t_elapse.tv_nsec = 1;
 
-    dpl.npool = 0;//dpl_psur->npool;
-    dpl.nring = 0;//dpl_psur->nring;
+    dpl.rsock = CheckNumaNodes();
+    if ( 0 == dpl.rsock ) {
+        syslog(LOG_NOTICE, "%s: Invalid Numa Node Number!\n", prog_name);
+        return -1;
+    }
+
+    if ( dpl.rsock < numa_node_c )
+        dpl.nsock = numa_node_c;
+    else
+        dpl.nsock = dpl.rsock;
+
+    syslog(LOG_NOTICE, "%s: Numa Node Number: %u\n", prog_name, dpl.nsock);
+
+    dpl.npool = mn_sf_daq_mbuf_get_count();
+    dpl.nring = mn_sf_daq_ring_get_count();
     dpl.ap_name = prog_name;
-    dpl.mpools = NULL;//dpl_psur->mpools;
-    dpl.rings = NULL;//dpl_psur->rings;
+    dpl.mpools = mn_sf_daq_mbuf_coll;
+    dpl.rings = mn_sf_daq_ring_coll;
     dpl.sf_init = sf_CflInit;
     dpl.sf_confluence = sf_Confluence;
     dpl.sf_ssn_init = sf_CflSsnInit;
@@ -143,7 +188,7 @@ int main(int argc, char *argv[])
     dpl.sp_scale = stats_ifport_scale;
 
     if ( mn_daq_Init(&dpl, lcore, lcore_utl, intf, log_daemon) ) {
-        LogMessage("%s: daq init failed\n", prog_name);
+        syslog(LOG_NOTICE, "%s: daq init failed\n", prog_name);
         return -1;
     }
 

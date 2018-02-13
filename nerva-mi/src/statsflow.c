@@ -458,6 +458,8 @@ static int sf_NetProtoPort_BitMap(void)
     DataplaneAddrs addr;
     NetFLowPortProtoMap *p_ppmap;
 
+    addr.sock_id = -1;
+
     //Init Port-Bitmap
     if ( 0 != DAQ_APGetMBuf((void*)&addr, MPOOL_PORT_BITMAP) ) {
         LogMessage("%s: Can't get MBuf for net_port_bitmap.\n", __func__);
@@ -619,6 +621,8 @@ static inline void PktCnt_SsnInspcScs(SSNCksumTrack * p_track, SSNProtoStatsNode
 {
     int ret_m;
     DataplaneAddrs dpMbufs;
+
+    dpMbufs.sock_id = -1;
 
     //inspection
     if ( ( SSN_CS_TRACK_PRE_CAP == p_track->cap )
@@ -1993,6 +1997,7 @@ static int sf_PktInspcInit(CounterNetFlow *pcnf)
     NetFlowPPmArray *sfPortMapArray;
 
     memset(pcnf, 0, sizeof(CounterNetFlow));
+    dpMbufs.sock_id = -1;
 
     ret_m = DAQ_APGetMBuf((void*)&dpMbufs, MPOOL_STATSFLOW);
     if ( !ret_m ) {
@@ -2608,9 +2613,14 @@ void sf_PktInsCheckOp(void)
 
     pins_cnf = &sfPktInspectCons;
 
+    if ( !sf_atomic32_test_on(&pins_cnf->dpSwitch) )
+        return;
+
     ret = DAQ_SFIPCRsp(pins_cnf, sizeof(CounterNetFlow), sf_Pins_ParseConfig, &req_type);
     if ( DAQ_SUCCESS != ret )
         return;
+
+    dpMbufs.sock_id = -1;
 
     switch (req_type) {
     case DAQ_SF_DP_SWAP_RTN:
@@ -2744,14 +2754,14 @@ void sf_PktInspcProc(Packet *p)
 
         //Ip Tuple
         nodesElem->itnode.cnt = 1;
-        nodesElem->itnode.bsize = pktlen;
+        nodesElem->itnode.bsz = pktlen;
         nodesElem->itnode.syn = 0;
         nodesElem->itnode.dns = 0;
         nodesElem->itnode.tv_upd = p->pkth->ts.tv_sec;
         nodesElem->itnode.direction = sf_stype;
-        ret = JHashIpTetAdd(pins_cnf->psDPIntef->h_tnode.hatbl, &pins_cnf->psDPIntef->tnode,
+        ret = JHashIpTetAdd(&pins_cnf->psDPIntef->h_tnode, &pins_cnf->psDPIntef->tnode,
                 &nodesElem->itnode, &targ_tnode, 0, 0);
-        if ( 0 != ret )
+        if ( ret < 0 )
             targ_tnode = NULL;
 
         //Not for fragmented packets
@@ -2848,8 +2858,8 @@ void sf_PktInspcProc(Packet *p)
                     nodesElem->ppnode.nk.proto, nodesElem->ppnode.nk.port, p->sp, p->dp,
                     nodesElem->ppnode.cnt, nodesElem->ppnode.bsize);*/
 
-            JHashProPortAdd(pins_cnf->psDPIntef->h_pnode.hatbl, &pins_cnf->psDPIntef->pnode,
-                    &nodesElem->ppnode, NULL, targ_tnode, 0);
+            JHashProPortAdd(&pins_cnf->psDPIntef->h_pnode, &pins_cnf->psDPIntef->pnode,
+                    &nodesElem->ppnode, NULL, targ_tnode, 0, 0);
         }
 
         //Tcp/Udp Session

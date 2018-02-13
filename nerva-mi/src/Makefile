@@ -8,6 +8,8 @@ release: libminv.a minerva
 #PUBLIB_DIR:=../../../PUBLIC_LIB
 #EXT_CFLAGS+=-I/usr/local/include_daq_206 -I$(PUBLIB_DIR)/include
 #EXT_LDFLAGS+=-L/usr/local/lib_daq_206
+#RTE_SDK=/home/lhzy01/git/surveyor/usi_midware/dpdk-stable-16.07.2
+#RTE_TARGET=build
 #Test-Debug End
 
 EXT_CFLAGS+=-I$(RTE_SDK)/$(RTE_TARGET)/include -DBUILD_DPDK_MODULE -msse4 
@@ -16,7 +18,7 @@ EXT_LDFLAGS+=-L./ -L/usr/lib/x86_64-linux-gnu -L$(RTE_SDK)/$(RTE_TARGET)/lib -Wl
 MI_DIR=./
 
 #header
-_MI_DEPS=mn_gen.h mn_daq.h statsifc.h mn_sf_cfl.h minerva.h mn_sf_sys_var.h
+_MI_DEPS=mn_gen.h mn_daq.h statsifc.h mn_sf_cfl.h minerva.h mn_sf_sys_var.h mn_mem_schedule.h
 #_MI_DEPS=statsifc.h minerva.h
 MI_DEPS=$(patsubst %, $(MI_DIR)/%, $(_MI_DEPS))
 #EXEC
@@ -37,7 +39,7 @@ minerva: $(MI_OBJS)
 	@echo "#####building minerva...#####"
 	gcc -o $@ $^ $(EXT_LDFLAGS) -lminv -lmysqlclient_r -lrt -lheartbeat -ldl -lpthread -lm -ldaq_static -ldaq_static_modules -lpcap -lsfbpf
 	@echo "#####build minerva end...#####"
-	-cp -f jhash.h branch_prediction.h mn_sf_cfl.h mn_sf_sys_var.h $(PUBLIB_DIR)/include
+	-cp -f jhash.h branch_prediction.h mn_sf_cfl.h mn_sf_sys_var.h mn_mem_schedule.h $(PUBLIB_DIR)/include
 
 debug:
 	$(CC)	$(DEBUG_CFLAGS) $(SRCS) $(INCS) -o minerva -I $(LIBS)

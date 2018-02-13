@@ -21,10 +21,11 @@
 #define     SQL_T_NAME_IF           "if_info"
 #define     SQL_SELECT_IFINFO       "SELECT count(*) FROM "SQL_T_NAME_IF" WHERE (if_name='%s');"
 #define     SQL_INSERT_IFINFO       "INSERT INTO "SQL_T_NAME_IF" (if_name,if_state,if_rxcnt,if_rxbyte,"\
-                                        "if_txcnt,if_txbyte,if_rxbps,if_txbps) "\
-                                        "VALUES ('%s','%u','%lu','%lu','%lu','%lu','%lu','%lu');"
+                                        "if_txcnt,if_txbyte,if_rxbps,if_txbps,if_rxperc,if_txperc,if_linkspeed) "\
+                                        "VALUES ('%s','%u','%lu','%lu','%lu','%lu','%lu','%lu','%f','%f','%u');"
 #define     SQL_UPDATE_IFINFO       "UPDATE "SQL_T_NAME_IF" SET if_state='%u',if_rxcnt='%lu',if_rxbyte='%lu',"\
-                                        "if_txcnt='%lu',if_txbyte='%lu',if_rxbps='%lu',if_txbps='%lu' "\
+                                        "if_txcnt='%lu',if_txbyte='%lu',if_rxbps='%lu',if_txbps='%lu',"\
+                                        "if_rxperc='%f',if_txperc='%f',if_linkspeed='%u' "\
                                         "WHERE (if_name='%s');"
 
 
@@ -38,6 +39,8 @@ typedef struct __portinfo
     uint64_t uTxPrcnt;
     uint64_t uTxPrbyte;
     uint64_t uTxPrbps;
+    float uRxIfperc;
+    float uTxIfperc;
 }Ifaceinfo;
 
 

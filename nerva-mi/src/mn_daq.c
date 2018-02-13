@@ -167,6 +167,11 @@ void *mn_daq_memcpy(void *mbuf_dst, const void *mbuf_src, uint32_t buf_len)
     return daq_rte_memcpy(daq_mod, mbuf_dst, mbuf_src, buf_len);
 }
 
+int mn_daq_get_mbuf(void *mbufs, uint8_t pool_idx)
+{
+    return daq_sf_get_mbufs(daq_mod, daq_hand, mbufs, pool_idx);
+}
+
 void mn_daq_breakloop_ext(void)
 {
     daq_breakloop_ext(daq_mod);

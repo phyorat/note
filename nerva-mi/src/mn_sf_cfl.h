@@ -27,95 +27,32 @@
 #include "jhash.h"
 #include "branch_prediction.h"
 
+#include "mn_mem_schedule.h"
 
-#ifdef BUILD_SP_SEALION
 
-//Distributed
-#define MAX_IPTET_HASHSZ                (0x20000)//4096
-#define IPTET_HASHSZ_MASK               (MAX_IPTET_HASHSZ-1)
-#define MAX_IPTET_NODE_SZ               (0x40000)//8192
-//#define IPTET_PKTCNT_MASK             (MAX_IPTET_PKTCNT_SZ-1)
-
-#define MAX_PROTOPORT_HASHSZ            (0x40000)
-#define PROTOPORT_HASHSZ_MASK           (MAX_PROTOPORT_HASHSZ-1)
-#define MAX_PROTOPORT_NODE_SZ           (0x80000)
-
-#define MAX_SSNPROTO_HASHSZ             (0x20000)
-#define SSNPROTO_HASHSZ_MASK            (MAX_SSNPROTO_HASHSZ-1)
-#define MAX_SSNPROTO_NODE_SZ            (0x40000)//8192
-#define SSNPROTO_NODE_SZ_MASK           (MAX_SSNPROTO_NODE_SZ-1)
-
-//Confluence
-#define MAX_IPTET_CONFLUENCE_HASHSZ                 (0x100000)
-#define IPTET_CONFLUENCE_HASHSZ_MASK                (MAX_IPTET_CONFLUENCE_HASHSZ-1)
-#define MAX_IPTET_CONFLUENCE_NODE_SZ                (0x800000)
-#define IPTET_CONFLUENCE_NODE_SZ_MASK               (MAX_IPTET_CONFLUENCE_NODE_SZ-1)
-
-#define MAX_PROTOPORT_CFL_HASHSZ            (0x100000)
-#define PROTOPORT_CFL_HASHSZ_MASK           (MAX_PROTOPORT_CFL_HASHSZ-1)
-#define MAX_PROTOPORT_CFL_NODE_SZ           (0x800000)
-
-/*#define MAX_SSNPROTO_CFL_HASHSZ             (0x100000)
-#define SSNPROTO_CFL_HASHSZ_MASK            (MAX_SSNPROTO_CFL_HASHSZ-1)
-#define MAX_SSNPROTO_CONFLUENCE_NODE_SZ             (0x400000)*/
-#define MAX_SSNPROTO_CFL_NODEPOOLS          (16)
-
-#else
-//Distributed
-#define MAX_IPTET_HASHSZ				(0x20000)//4096
-#define IPTET_HASHSZ_MASK				(MAX_IPTET_HASHSZ-1)
-#define MAX_IPTET_NODE_SZ				(0x40000)//8192
-//#define IPTET_PKTCNT_MASK             (MAX_IPTET_PKTCNT_SZ-1)
-
-#define MAX_PROTOPORT_HASHSZ            (0x40000)
-#define PROTOPORT_HASHSZ_MASK           (MAX_PROTOPORT_HASHSZ-1)
-#define MAX_PROTOPORT_NODE_SZ           (0x100000)
-
-#define MAX_SSNPROTO_HASHSZ             (0x20000)
-#define SSNPROTO_HASHSZ_MASK            (MAX_SSNPROTO_HASHSZ-1)
-#define MAX_SSNPROTO_NODE_SZ            (0x40000)//8192
-#define SSNPROTO_NODE_SZ_MASK           (MAX_SSNPROTO_NODE_SZ-1)
-
-//Confluence
-#define MAX_IPTET_CONFLUENCE_HASHSZ					(0x100000)
-#define IPTET_CONFLUENCE_HASHSZ_MASK				(MAX_IPTET_CONFLUENCE_HASHSZ-1)
-#define MAX_IPTET_CONFLUENCE_NODE_SZ				(0x800000)
-#define IPTET_CONFLUENCE_NODE_SZ_MASK               (MAX_IPTET_CONFLUENCE_NODE_SZ-1)
-
-#define MAX_PROTOPORT_CFL_HASHSZ            (0x100000)
-#define PROTOPORT_CFL_HASHSZ_MASK           (MAX_PROTOPORT_CFL_HASHSZ-1)
-#define MAX_PROTOPORT_CFL_NODE_SZ           (0x800000)
-
-/*#define MAX_SSNPROTO_CFL_HASHSZ             (0x100000)
-#define SSNPROTO_CFL_HASHSZ_MASK            (MAX_SSNPROTO_CFL_HASHSZ-1)
-#define MAX_SSNPROTO_CONFLUENCE_NODE_SZ             (0x400000)*/
-#define MAX_SSNPROTO_CFL_NODEPOOLS          (16)
-#endif
-
-//STATSFLOW MBUF_RING
-#define SUR_SF_MP_NUM_POOL_SIZE             2
-#define SUR_SF_RING_MSG_TOLERATE            8
-#define SUR_SF_RING_MSG_QUEUE_SIZE          SUR_SF_RING_MSG_TOLERATE
-
-#define SUR_SF_MP_CFL_MASTER_NUM             1
-
+/*******Pkt Inspection********/
 //Define pkt small
-#define NETFLOW_SMALL_PKT       62
+#define NETFLOW_SMALL_PKT                   62      //Define Pkt Small
+#define SF_EP_MAX_EVENTS                    8       //statsflow switch node timer.
+//#define MAX_SEC_IPTET_DBREC_EXPIRE          604800  //60×60×24×7, one week
+#define MAX_SEC_SSN_NODE_TRACK_EXPIRE       86400  //60×60×24, 24 hours
+/*******Pkt Inspection End********/
 
 
-#define SF_EP_MAX_EVENTS        8
-//Pkt Inspection End
-
-#define MAX_SEC_IPTET_DBREC_EXPIRE      604800//60×60×24×7, one week
-#define MAX_SEC_SSN_NODE_TRACK_EXPIRE   604800//60×60×24×7, one week
-
-//#define TCP_SSN_PKTGEN_DEBUG
-
-#define SUR_SF_IPT_PP_SCALE_BASE_TIME       30      //20 seconds
-#define SUR_SF_IPT_PP_SCALE_SUM_CNT         2       //60 seconds
+/*******FLOW STATS SCALE********/
+#define SUR_SF_SCALE_EN_MINUTES             0
+#define SUR_SF_IPT_PP_SCALE_BASE_TIME       30      //seconds
+#define SUR_SF_IPT_PP_SCALE_SUM_CNT         2       //?
 #define SUR_SF_IPT_PP_SCALE_VAL_MIN         60      //aligned with above two MACRO
 #define SUR_SF_IPT_PP_SCALE_VAL_HOUR        3600    //One Hour
 #define SUR_SF_IPT_PP_SCALE_VAL_DAY         86400   //One Day
+/*******FLOW STATS SCALE END********/
+
+
+/*******DEBUG********/
+//#define TCP_SSN_PKTGEN_DEBUG
+/*******DEBUG END********/
+
 
 /*
  * Atomic Operation
@@ -143,6 +80,11 @@ sf_atomic32_cmpset(volatile uint32_t *dst, uint32_t exp, uint32_t src)
 	return res;
 }
 
+static inline int sf_atomic32_test_on(sf_atomic32_t *v)
+{
+    return (1 == (v->cnt));
+}
+
 static inline int sf_atomic32_test_and_set(sf_atomic32_t *v)
 {
 	return sf_atomic32_cmpset((volatile uint32_t *)&v->cnt, 0, 1);
@@ -162,6 +104,16 @@ static inline int sf_switch_test_and_set_off(sf_atomic32_t *v)
 {
 	return sf_atomic32_cmpset((volatile uint32_t *)&v->cnt, 2, 0);
 }
+
+
+//Port-Bitmap Recognition
+#define SF_NETPROTOPORT_BITMAP_ELEM     1024
+typedef struct __NetProtoPortIdBitmap
+{
+    uint16_t stc[SF_NETPROTOPORT_BITMAP_ELEM];  //Step Count
+    uint64_t bm[SF_NETPROTOPORT_BITMAP_ELEM];   //Bit Map
+} NetProtoPortIdBitmap;
+
 
 /*
  * Business definition
@@ -364,9 +316,9 @@ typedef enum
 typedef enum
 {
     NF_IPTET_FLOW_DATA = 0x01,
-    NF_IPTET_ALM_FLAG = 0x02,
+    NF_IPTET_DEDICATE_FLAG = 0x02,
     NF_IPTET_FLOW_DATA_QNC = 0x04,      //queried but not confirm
-    NF_IPTET_ALM_FLAG_QNC = 0x08,      //queried but not confirm
+    NF_IPTET_DEDICATE_FLAG_QNC = 0x08,      //queried but not confirm
 } netflow_iptet_query_flag;
 
 typedef enum
@@ -386,6 +338,7 @@ typedef enum
     SF_ALY_PROTO_SESSION,
     SF_ALY_HB,
     SF_ALY_SSN_ALM_FLAG,
+    SF_ALY_GEO_MAP,
     SF_ALY_COUNT,
 } StatsFlowAnalystType;
 
@@ -401,6 +354,13 @@ typedef enum
     SFALY_ALARM_SSN_CAP_HB = 0x80,
     SFALY_ALARM_MASK = 0xff
 } sfaly_alarm_type;
+
+typedef enum
+{
+    SFALY_STA_FLAG_GEO = 0x01,
+    SFALY_STA_FLAG_GEO_FLOW = 0x02,
+    SFALY_STA_MASK = 0xff,
+} sfaly_sta_type;
 
 /*#########################################
  * Keep Align With Definition in portrait
@@ -688,14 +648,30 @@ typedef struct __ProtoPortNode {
 
 typedef enum
 {
-    SF_PROTP_SCALE_STAGE_META = 0,
-    SF_PROTP_SCALE_STAGE_MIN,
-    SF_PROTP_SCALE_STAGE_HOUR,
-    SF_PROTP_SCALE_STAGE_DAY,
-    SF_PROTP_SCALE_STAGE_MONTH,
-    SF_PROTP_SCALE_STAGE_MAX,
-    SF_PROTP_SCALE_STAGE_SAVE = (SF_PROTP_SCALE_STAGE_HOUR+1),
+    SF_SCALE_STAGE_META = 0,
+#if SUR_SF_SCALE_EN_MINUTES
+    SF_SCALE_STAGE_MIN,
+    SF_SCALE_STAGE_HOUR,
+#else
+    SF_SCALE_STAGE_HOUR,
+    SF_SCALE_STAGE_MIN = SF_SCALE_STAGE_HOUR,
+#endif
+    SF_SCALE_STAGE_DAY,
+    SF_SCALE_STAGE_MONTH,
+    SF_SCALE_STAGE_MAX,
+    SF_SCALE_STAGE_SAVE = (SF_SCALE_STAGE_HOUR+1),
 } sf_ProtoPort_Scale_Stage;
+
+typedef enum        //NOTE: Index Align With 'sf_ProtoPort_Scale_Stage'
+{
+    SF_GEO_SCALE_STAGE_META = 0,
+    SF_GEO_SCALE_STAGE_MIN,
+    SF_GEO_SCALE_STAGE_HOUR,
+    SF_GEO_SCALE_STAGE_DAY,
+    SF_GEO_SCALE_STAGE_MONTH,
+    SF_GEO_SCALE_STAGE_MAX,
+    SF_GEO_SCALE_STAGE_SAVE = (SF_GEO_SCALE_STAGE_HOUR+1),
+} sf_Geo_Scale_Stage;
 
 typedef struct __ProtoPortCflNode {
     struct __ProtoPortCflNode *hnxt;
@@ -708,7 +684,7 @@ typedef struct __ProtoPortCflNode {
     struct {
         uint32_t cnt;
         uint32_t bsz;
-    } scl_st[SF_PROTP_SCALE_STAGE_SAVE];
+    } scl_st[SF_SCALE_STAGE_SAVE];
 } ProtoPortCflNode;
 
 /**************************************************This two struct must be aligned at first part**/
@@ -717,13 +693,13 @@ typedef struct __IPTetStatNode {
 	struct __IPTetStatNode *nxt;
 	ProtoPortNode *pp_node;
 	IPTet tet;
-	uint32_t cnt;
-	uint32_t bsize;
-	uint32_t syn;   //SYN pkt count
-	uint32_t dns;   //DNS pkt count
+	uint64_t syn:31,        //SYN pkt count
+	         dns:31,        //DNS pkt count
+	         direction:2;   //1, Inside-Out; 2, Outside-In
 	uint32_t tv_upd;
-	uint8_t direction;  //1, Inside-Out; 2, Outside-In
 	SSNProtoStatsNode *ssn_node;
+	uint32_t cnt;
+	uint32_t bsz;
 } IPTetStatNode;
 
 /*
@@ -771,15 +747,18 @@ typedef struct __IPTetCflStatNode {
 	struct __IPTetCflStatNode *nxt;
 	ProtoPortCflNode *pp_node;
 	IPTet tet;
-	uint32_t cnt;
-	uint32_t bsize;
-	uint32_t syn;   //SYN pkt count
-	uint32_t dns;   //DNS pkt count
+	uint64_t syn:31,        //SYN pkt count
+	         dns:31,        //DNS pkt count
+	         direction:2;   //1, Inside-Out; 2, Outside-In
 	uint32_t tv_upd;
-	uint8_t direction;  //1, Inside-Out; 2, Outside-In
-	IPTetCflPPFlag ppflag;//SSNProtoStatsCflNode *ssn_node;//replace pointer "ssn_node"
-	uint64_t dbid;
-	uint32_t hsum;
+	uint64_t dbid;      //replace pointer "ssn_node"
+	struct {
+	    uint32_t cnt;
+	    uint32_t bsz;
+	} scl_st[SF_SCALE_STAGE_SAVE];
+	IPTetCflPPFlag ppflag;//SSNProtoStatsCflNode *ssn_node;
+	uint64_t geo_index;
+	uint32_t sf_sta;
 	uint32_t almflag;
 	volatile uint8_t expire;     //The only variable that other thread can modify without lock
 	volatile uint8_t aly_stat;   //if sent to analyst after last update
@@ -813,8 +792,8 @@ typedef struct __SSNAlySockSend
 {
     uint32_t type;
     uint32_t pad[1];
-    uint64_t id_start;
-    uint64_t id_end;
+    uint64_t id_1;
+    uint64_t id_2;
 } SFAlySockSend;
 
 typedef struct __SSNProtoNodeHaTbl {
@@ -855,22 +834,30 @@ typedef struct __StatsFlowDPSSN
  *
  */
 typedef struct __IPTetConfluenceNodeHaTbl {
-	IPTetCflStatNode *hatbl[MAX_IPTET_CONFLUENCE_HASHSZ];
+    //IPTetCflStatNode *hatbl[MAX_IPTET_CONFLUENCE_HASHSZ];
+    uint64_t size;
+    IPTetCflStatNode **hatbl;
 } IPTetConfluenceNodeHaTbl;
 
 typedef struct __IPTetConfluenceNodePool {
-	uint32_t npidx;
-	uint32_t npcnt;
-	IPTetCflStatNode nodes[MAX_IPTET_CONFLUENCE_NODE_SZ];
+	uint64_t npidx;
+	uint64_t npcnt;
+	uint64_t total;
+	//IPTetCflStatNode nodes[MAX_IPTET_CONFLUENCE_NODE_SZ];
+	IPTetCflStatNode *nodes;
 } IPTetConfluenceNodePool;
 
 typedef struct __ProtoPortCflNodeHaTbl {
-    ProtoPortCflNode *hatbl[MAX_PROTOPORT_CFL_HASHSZ];
+    //ProtoPortCflNode *hatbl[MAX_PROTOPORT_CFL_HASHSZ];
+    uint64_t size;
+    ProtoPortCflNode **hatbl;
 } ProtoPortCflNodeHaTbl;
 
 typedef struct __ProtoPortCflNodePool {
     uint32_t npidx;
-    ProtoPortCflNode nodes[MAX_PROTOPORT_CFL_NODE_SZ];
+    uint64_t total;
+    //ProtoPortCflNode nodes[MAX_PROTOPORT_CFL_NODE_SZ];
+    ProtoPortCflNode *nodes;
 } ProtoPortCflNodePool;
 /*
 typedef struct __SSNProtoCflNodeHaTbl {
@@ -884,13 +871,14 @@ typedef struct __SSNProtoCflNodePool {
 */
 typedef struct _StatsFlowConfluDataPlane
 {
+    uint16_t nsock;
     SSNProtoNodeHaTbl *p_hnode[MAX_SSNPROTO_CFL_NODEPOOLS];
     SSNProtoNodePool *p_snode[MAX_SSNPROTO_CFL_NODEPOOLS];
-    IPTetConfluenceNodeHaTbl h_tnode;//0x100000*8
-    ProtoPortCflNodeHaTbl h_pnode;
-    IPTetConfluenceNodePool tnode;//0x6000000*48 +4
-    ProtoPortCflNodePool pnode;
-    ProStackConfluenceTbl stack;//26*16
+    IPTetConfluenceNodeHaTbl h_tnode[DAQ_DP_MP_NUMAEX_NODE_NUM];
+    ProtoPortCflNodeHaTbl h_pnode[DAQ_DP_MP_NUMAEX_NODE_NUM];
+    IPTetConfluenceNodePool tnode[DAQ_DP_MP_NUMAEX_NODE_NUM];
+    ProtoPortCflNodePool pnode[DAQ_DP_MP_NUMAEX_NODE_NUM];
+    ProStackConfluenceTbl stack;
 } StatsFlowConfluDataPlane;
 //0x6000000⋅48+0x400000⋅16+0x100000⋅8+26⋅16
 /*data-plane loader
@@ -912,14 +900,31 @@ typedef struct _CounterNetFlow
 } CounterNetFlow;
 
 typedef enum {
-    SF_GLOB_VAR_PP_SCALE_L0 = (0x01<<SF_PROTP_SCALE_STAGE_META),    //Stock Data
-    SF_GLOB_VAR_PP_SCALE_L1 = (0x01<<SF_PROTP_SCALE_STAGE_MIN),
-    SF_GLOB_VAR_PP_SCALE_L2 = (0x01<<SF_PROTP_SCALE_STAGE_HOUR),
-    SF_GLOB_VAR_PP_SCALE_L3 = (0x01<<SF_PROTP_SCALE_STAGE_DAY),     // Note: L3 and L4 need assists of L2!
-    SF_GLOB_VAR_PP_SCALE_L4 = (0x01<<SF_PROTP_SCALE_STAGE_MONTH),
-    SF_GLOB_VAR_PP_SCALE_DEEP = 0x06,
-    SF_GLOB_VAR_PP_SCALE_DEEP_ALL = 0x1E,
-    SF_GLOB_VAR_PP_SCALE_DEEP_LIT = 0x0C,
+    SF_GLOB_VAR_SCALE_L0 = (0x01<<SF_SCALE_STAGE_META),    //Stock Data
+#if SUR_SF_SCALE_EN_MINUTES
+    SF_GLOB_VAR_SCALE_L1 = (0x01<<SF_SCALE_STAGE_MIN),
+#else
+    SF_GLOB_VAR_SCALE_L1 = (0x00),
+#endif
+    SF_GLOB_VAR_SCALE_L2 = (0x01<<SF_SCALE_STAGE_HOUR),
+    SF_GLOB_VAR_SCALE_L3 = (0x01<<SF_SCALE_STAGE_DAY),     // Note: L3 and L4 need assists of L2!
+    SF_GLOB_VAR_SCALE_L4 = (0x01<<SF_SCALE_STAGE_MONTH),
+#if SUR_SF_SCALE_EN_MINUTES
+    SF_GLOB_VAR_SCALE_DEEP = 0x06,
+    SF_GLOB_VAR_SCALE_DEEP_ALL = 0x1E,
+    SF_GLOB_VAR_SCALE_DEEP_LIT = 0x0C,
+#else
+    SF_GLOB_VAR_SCALE_DEEP = 0x03,
+    SF_GLOB_VAR_SCALE_DEEP_ALL = 0x0E,
+    SF_GLOB_VAR_SCALE_DEEP_LIT = 0x06,
+#endif
+    SF_GLOB_VAR_SCALE_MASK = 0xff,
+/*    SF_GLOB_VAR_GEO_SCALE_L0 = (0x01<<SF_SCALE_STAGE_META),    //Stock Data
+    SF_GLOB_VAR_GEO_SCALE_L1 = (0x01<<SF_SCALE_STAGE_MIN),
+    SF_GLOB_VAR_GEO_SCALE_L2 = (0x100<<SF_GEO_SCALE_STAGE_HOUR),
+    SF_GLOB_VAR_GEO_SCALE_L3 = (0x01<<SF_SCALE_STAGE_DAY),     // Note: L3 and L4 need assists of L2!
+    SF_GLOB_VAR_GEO_SCALE_L4 = (0x01<<SF_SCALE_STAGE_MONTH),
+    SF_GLOB_VAR_GEO_SCALE_MASK = 0xff00,*/
     SF_GLOB_VAR_MAX = 0xff,
 } StatsGlobalSetup;
 
@@ -952,18 +957,18 @@ static inline int sf_memcmp(s1, s2, n)
 /*
  * Function inline
  */
-static inline ProtoPortCflNode * SfProtoPortGetCflNode(ProtoPortCflNodePool *nodepool)
+static inline ProtoPortCflNode * SfProtoPortGetCflNode(ProtoPortCflNodePool *nodepool, uint16_t dist)
 {
     uint8_t i;
     ProtoPortCflNode *cNode;
 
-    if ( nodepool->npidx >= MAX_PROTOPORT_CFL_NODE_SZ )
+    if ( nodepool[dist].npidx >= nodepool[dist].total )
         return NULL;
-    cNode = nodepool->nodes+nodepool->npidx;
-    nodepool->npidx++;
+    cNode = nodepool[dist].nodes+nodepool[dist].npidx;
+    nodepool[dist].npidx++;
 
     //pre-set cfl-node state
-    for ( i=SF_PROTP_SCALE_STAGE_MIN; i<SF_PROTP_SCALE_STAGE_SAVE; i++ ) {
+    for ( i=SF_SCALE_STAGE_MIN; i<SF_SCALE_STAGE_SAVE; i++ ) {
         cNode->scl_st[i].cnt = 0;
         cNode->scl_st[i].bsz = 0;
     }
@@ -974,13 +979,13 @@ static inline ProtoPortCflNode * SfProtoPortGetCflNode(ProtoPortCflNodePool *nod
 /*
  * Function inline
  */
-static inline ProtoPortNode * SfProtoPortGetNode(ProtoPortNodePool *nodepool, uint8_t cfl_plane)
+static inline ProtoPortNode * SfProtoPortGetNode(ProtoPortNodePool *nodepool, uint8_t cfl_plane, uint16_t dist)
 {
     ProtoPortNode *eNode;
 
     //Confluence Node
     if ( cfl_plane )
-        return (ProtoPortNode*)SfProtoPortGetCflNode((ProtoPortCflNodePool*)nodepool);
+        return (ProtoPortNode*)SfProtoPortGetCflNode((ProtoPortCflNodePool*)nodepool, dist);
 
     //Scale Node
     if ( nodepool->npidx >= MAX_PROTOPORT_NODE_SZ )
@@ -1013,8 +1018,9 @@ static inline void jIptetAppendPpNode(IPTetStatNode *ipt_node, ProtoPortNode *pp
     }
 }
 
-static inline int JHashProPortAdd(ProtoPortNode **hamap, ProtoPortNodePool *nodepool,
-        const ProtoPortNode *ppn, ProtoPortNode **ipt_target, IPTetStatNode *ipt_node, uint8_t cfl_plane)//, uint8_t db_data)
+static inline int JHashProPortAdd(ProtoPortNodeHaTbl *hanodes, ProtoPortNodePool *nodepool,
+        const ProtoPortNode *ppn, ProtoPortNode **ipt_target, IPTetStatNode *ipt_node,
+        uint8_t cfl_plane, uint8_t nsock_idx)
 {
     uint32_t HashVal;
     ProtoPortNode **jHead;
@@ -1022,12 +1028,18 @@ static inline int JHashProPortAdd(ProtoPortNode **hamap, ProtoPortNodePool *node
     ProtoPortNode *tNode;
 
     HashVal = jhash(&ppn->key, sizeof(ProtoProtNodeKeyDemo), 0);
-    jHead = hamap + (HashVal&PROTOPORT_HASHSZ_MASK);
+    if (cfl_plane) {
+        jHead = (ProtoPortNode**)( ((ProtoPortCflNodeHaTbl*)hanodes)[nsock_idx].hatbl +
+                    ( HashVal & (((ProtoPortCflNodeHaTbl*)hanodes)[nsock_idx].size-1) ) );
+    }
+    else {
+        jHead = hanodes->hatbl + (HashVal&PROTOPORT_HASHSZ_MASK);
+    }
     tNode = *jHead;
 
     //New Node, Not In Hash List
     if ( NULL == tNode ) {
-        if ( NULL == (iNode=SfProtoPortGetNode(nodepool, cfl_plane)) )
+        if ( NULL == (iNode=SfProtoPortGetNode(nodepool, cfl_plane, nsock_idx)) )
             return -1;
         jHashProtoPortDupNode(iNode, ppn);
         *jHead = iNode;
@@ -1052,7 +1064,7 @@ static inline int JHashProPortAdd(ProtoPortNode **hamap, ProtoPortNodePool *node
         } while ( 1 );
 
         //Append to Conflict List
-        if ( NULL == (iNode=SfProtoPortGetNode(nodepool, cfl_plane)) )
+        if ( NULL == (iNode=SfProtoPortGetNode(nodepool, cfl_plane, nsock_idx)) )
             return -1;
         jHashProtoPortDupNode(iNode, ppn);
         tNode->hnxt = iNode;
@@ -1268,7 +1280,10 @@ static inline int SfSSNStatsNodeOper(IPTetStatNode *tnode, SSNProtoNodePool *sno
 	return 0;
 }*/
 
-static inline IPTetCflStatNode * SfIpTetGetCflNode(IPTetConfluenceNodePool *nodepool)
+#define SF_IPTET_NODE_FLAG_CFL  0x01
+#define SF_IPTET_NODE_FLAG_IDB  0x02
+
+static inline IPTetCflStatNode * SfIpTetGetCflNode(IPTetConfluenceNodePool *nodepool, uint16_t dist)
 {
     int i;
     IPTetCflStatNode *eNode;
@@ -1279,29 +1294,37 @@ static inline IPTetCflStatNode * SfIpTetGetCflNode(IPTetConfluenceNodePool *node
 	eNode = nodepool->nodes+nodepool->npidx;
 	nodepool->npidx++;*/
 
-    for ( i=0; i<MAX_IPTET_CONFLUENCE_NODE_SZ; i++ ) {
-        eNode = nodepool->nodes+nodepool->npidx;
-        nodepool->npidx = (nodepool->npidx+1)&IPTET_CONFLUENCE_NODE_SZ_MASK;
+    for ( i=0; i<nodepool[dist].total; i++ ) {
+        eNode = nodepool[dist].nodes+nodepool[dist].npidx;
+        if ( nodepool[dist].npidx < (nodepool[dist].total-1) )
+            nodepool[dist].npidx = nodepool[dist].npidx + 1;
+        else
+            nodepool[dist].npidx = 0;
         if ( NF_NODEIPT_IDLE == eNode->fsm ) { //Node valid (Not in use)
             eNode->fsm = NF_NODEIPT_RESERVED;
-            nodepool->npcnt++;
+            nodepool[dist].npcnt++;
             break;
         }
     }
 
-    if ( i >= MAX_IPTET_CONFLUENCE_NODE_SZ )
+    if ( i >= nodepool[dist].total )
         return NULL;
+
+    for ( i=SF_SCALE_STAGE_MIN; i<SF_SCALE_STAGE_SAVE; i++ ) {
+        eNode->scl_st[i].cnt = 0;
+        eNode->scl_st[i].bsz = 0;
+    }
 
     return eNode;
 }
 
-static inline IPTetStatNode * SfIpTetGetNode(IPTetStatNodePool *nodepool, uint8_t cfl_plane)
+static inline IPTetStatNode * SfIpTetGetNode(IPTetStatNodePool *nodepool, uint8_t cfl_plane, uint16_t dist)
 {
 	IPTetStatNode *eNode;
 
 	//Confluence Node
 	if ( cfl_plane )
-		return (IPTetStatNode*)SfIpTetGetCflNode((IPTetConfluenceNodePool*)nodepool);
+		return (IPTetStatNode*)SfIpTetGetCflNode((IPTetConfluenceNodePool*)nodepool, dist);
 
 	//Scale Node
 	if ( nodepool->npidx >= MAX_IPTET_NODE_SZ )
@@ -1313,7 +1336,7 @@ static inline IPTetStatNode * SfIpTetGetNode(IPTetStatNodePool *nodepool, uint8_
 }
 
 static inline void jHashIpTetDupNode(IPTetStatNode *dst, const IPTetStatNode *src,
-		uint32_t hash_val, uint8_t cfl_plane, uint8_t db_data)
+		uint8_t cfl_flag)
 {
 	uint8_t i;
 	IPTetCflStatNode *iNodeCfl;
@@ -1321,7 +1344,7 @@ static inline void jHashIpTetDupNode(IPTetStatNode *dst, const IPTetStatNode *sr
 	dst->tet.src = src->tet.src;
 	dst->tet.dst = src->tet.dst;
 	dst->cnt = src->cnt;
-	dst->bsize = src->bsize;
+	dst->bsz = src->bsz;
 	dst->syn = src->syn;
 	dst->dns = src->dns;
 	dst->tv_upd = src->tv_upd;
@@ -1329,10 +1352,10 @@ static inline void jHashIpTetDupNode(IPTetStatNode *dst, const IPTetStatNode *sr
 	dst->nxt = NULL;
 	dst->pp_node = NULL;
 
-	if ( cfl_plane ) {
+	if ( SF_IPTET_NODE_FLAG_CFL & cfl_flag ) {
 		iNodeCfl = (IPTetCflStatNode*)dst;
-		iNodeCfl->hsum = hash_val;
-		if ( likely(!db_data) ) {
+		//iNodeCfl->hsum = hash_val;
+		if ( likely(!(SF_IPTET_NODE_FLAG_IDB & cfl_flag)) ) {
 			iNodeCfl->fsm = NF_NODEIPT_NEW;
 		}
 		else {
@@ -1341,15 +1364,18 @@ static inline void jHashIpTetDupNode(IPTetStatNode *dst, const IPTetStatNode *sr
 		    for ( i=0; i<NF_IPTET_PFLAG_NUM; i++ ) {
 		        iNodeCfl->ppflag.flag[i] = ((IPTetCflStatNode*)src)->ppflag.flag[i];
 		    }
+		    iNodeCfl->sf_sta = ((IPTetCflStatNode*)src)->sf_sta;
+		    iNodeCfl->geo_index = ((IPTetCflStatNode*)src)->geo_index;
 		    iNodeCfl->almflag = ((IPTetCflStatNode*)src)->almflag;
 		    iNodeCfl->aly_stat = ((IPTetCflStatNode*)src)->aly_stat;
 		}
 	}
 }
 
-static inline int JHashIpTetAdd(IPTetStatNode **hamap, IPTetStatNodePool *nodepool,
-		const IPTetStatNode *ipt, IPTetStatNode **ipt_target, uint8_t cfl_plane, uint8_t db_data)
+static inline int JHashIpTetAdd(IPTetStatNodeHaTbl *hanodes, IPTetStatNodePool *nodepool,
+		const IPTetStatNode *ipt, IPTetStatNode **ipt_target, uint8_t cfl_flag, uint16_t nsock_mask)
 {
+    uint16_t nsock_idx;
     uint32_t HashVal;
     IPTetStatNode **jHead;
     IPTetStatNode *iNode;
@@ -1357,17 +1383,23 @@ static inline int JHashIpTetAdd(IPTetStatNode **hamap, IPTetStatNodePool *nodepo
     IPTetCflStatNode *iNodeCfl;
 
     HashVal = jhash(&(ipt->tet), sizeof(IPTet), 0);
-    if ( cfl_plane )
-    	jHead = hamap + (HashVal&IPTET_CONFLUENCE_HASHSZ_MASK);
-    else
-    	jHead = hamap + (HashVal&IPTET_HASHSZ_MASK);
+    nsock_idx = HashVal&nsock_mask;
+
+    if ( SF_IPTET_NODE_FLAG_CFL & cfl_flag ) {
+    	jHead = (IPTetStatNode**)( ((IPTetConfluenceNodeHaTbl*)hanodes)[nsock_idx].hatbl +
+    	            ( HashVal & (((IPTetConfluenceNodeHaTbl*)hanodes)[nsock_idx].size-1) ) );
+    }
+    else {
+    	jHead = hanodes->hatbl + (HashVal&IPTET_HASHSZ_MASK);
+    }
     tNode = *jHead;
 
     //New Node, Not In Hash List
     if ( NULL == tNode ) {
-    	if ( NULL == (iNode=SfIpTetGetNode(nodepool, cfl_plane)) )
+    	if ( NULL == (iNode=SfIpTetGetNode(nodepool,
+    	        (SF_IPTET_NODE_FLAG_CFL&cfl_flag), nsock_idx)) )
     		return -1;
-   		jHashIpTetDupNode(iNode, ipt, HashVal, cfl_plane, db_data);
+   		jHashIpTetDupNode(iNode, ipt, cfl_flag);
     	*jHead = iNode;
     }
     else {
@@ -1376,15 +1408,15 @@ static inline int JHashIpTetAdd(IPTetStatNode **hamap, IPTetStatNodePool *nodepo
     		if ( tNode->tet.src == ipt->tet.src
     				&& tNode->tet.dst == ipt->tet.dst ) {	// In Hash List
     			tNode->cnt += ipt->cnt;
-    			tNode->bsize += ipt->bsize;
+    			tNode->bsz += ipt->bsz;
     			tNode->syn += ipt->syn;
     			tNode->dns += ipt->dns;
     			if ( ipt->tv_upd > tNode->tv_upd )
     			    tNode->tv_upd = ipt->tv_upd;
     			tNode->direction = ipt->direction;
-    			if ( cfl_plane ) {
+    			if ( SF_IPTET_NODE_FLAG_CFL & cfl_flag ) {
     				iNodeCfl = (IPTetCflStatNode*)tNode;
-    				if ( likely(!db_data) ) {
+    				if ( likely(!(SF_IPTET_NODE_FLAG_IDB&cfl_flag)) ) {
     					if ( NF_NODEIPT_SYNCED == iNodeCfl->fsm )
     						iNodeCfl->fsm = NF_NODEIPT_UPD;
     					else if ( NF_NODEIPT_NEW == iNodeCfl->fsm )
@@ -1400,7 +1432,7 @@ static inline int JHashIpTetAdd(IPTetStatNode **hamap, IPTetStatNodePool *nodepo
 
     			if ( ipt_target )
     				*ipt_target = tNode;
-    			return 0;
+    			return nsock_idx;
     		}
 
     		if ( NULL == tNode->nxt )
@@ -1409,15 +1441,16 @@ static inline int JHashIpTetAdd(IPTetStatNode **hamap, IPTetStatNodePool *nodepo
     	} while ( 1 );
 
 		//Append to Conflict List
-    	if ( NULL == (iNode=SfIpTetGetNode(nodepool, cfl_plane)) )
+    	if ( NULL == (iNode=SfIpTetGetNode(nodepool,
+    	        (SF_IPTET_NODE_FLAG_CFL&cfl_flag), nsock_idx)) )
     		return -1;
-    	jHashIpTetDupNode(iNode, ipt, HashVal, cfl_plane, db_data);
+    	jHashIpTetDupNode(iNode, ipt, cfl_flag);
     	tNode->nxt = iNode;
     }
 
     if ( ipt_target )
     	*ipt_target = iNode;
-    return 0;
+    return nsock_idx;
 }
 
 /*static inline int JHashIpTetCflSetExp(IPTetCflStatNode **hamap, IPTetConfluenceNodePool *nodepool,
@@ -1446,7 +1479,7 @@ static inline int JHashIpTetAdd(IPTetStatNode **hamap, IPTetStatNodePool *nodepo
     return -1;
 }*/
 
-static inline int JHashIpTetCflDel(IPTetCflStatNode **hamap, IPTetConfluenceNodePool *nodepool,
+static inline int JHashIpTetCflDel(IPTetConfluenceNodeHaTbl *hanodes, IPTetConfluenceNodePool *nodepool,
         IPTet *tet, uint64_t targ_dbid)
 {
     uint32_t HashVal;
@@ -1454,7 +1487,7 @@ static inline int JHashIpTetCflDel(IPTetCflStatNode **hamap, IPTetConfluenceNode
     IPTetCflStatNode *tNode, *tNodePre;
 
     HashVal = jhash(tet, sizeof(IPTet), 0);
-    jHead = hamap + (HashVal&IPTET_CONFLUENCE_HASHSZ_MASK);
+    jHead = hanodes->hatbl + (HashVal&(hanodes->size-1));
     tNode = *jHead;
     tNodePre = NULL;
 
@@ -1509,8 +1542,8 @@ static inline int JHashIpTetCflGetDbid(IPTetCflStatNode **hamap, const IPTet *ip
     return -1;
 }
 
-int sf_CflInit(void *dp_cfl);
-int sf_Confluence(void *dp_cfl, void *dp, uint8_t dp_type, uint8_t db_sync);
+int sf_CflInit(void *dp_cfl, uint16_t rsock, uint16_t nsock);
+int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uint8_t db_sync);
 int sf_CflSsnInit(void);
 int sf_CflSession(void *dp_cfl);
 int sf_DBIns_Loop(void *dp_cfl);

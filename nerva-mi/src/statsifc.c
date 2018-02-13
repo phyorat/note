@@ -136,6 +136,15 @@ int stats_ifport_scale(xstatsinfo *xtinfo, uint8_t pid)
     if_info.uTxPrbyte = xtinfo->uTxPrbyte;
     if_info.uTxPrbps = xtinfo->uTxPrbyte - sPinfo[pid].uTxPrbyte;
 
+    if ( (1 == if_info.cIfup) && (xtinfo->link_speed > 0) ) {
+        if_info.uRxIfperc = (float)(if_info.uRxPrbps*25)/(float)(xtinfo->link_speed*32768);
+        if_info.uTxIfperc = (float)(if_info.uTxPrbps*25)/(float)(xtinfo->link_speed*32768);
+    }
+    else {
+        if_info.uRxIfperc = 0;
+        if_info.uTxIfperc = 0;
+    }
+
     snprintf(sql_str, sizeof(sql_str), SQL_SELECT_IFINFO, sPinfo[pid].if_name);
     ret = mn_MysqlSelectUint(sp_mysql, sql_str, &s_cnt);
     if ( ret < 0 ) {
@@ -158,6 +167,8 @@ int stats_ifport_scale(xstatsinfo *xtinfo, uint8_t pid)
         		if_info.uRxPrcnt, if_info.uRxPrbyte,
         		if_info.uTxPrcnt, if_info.uTxPrbyte,
         		if_info.uRxPrbps, if_info.uTxPrbps,
+        		if_info.uRxIfperc, if_info.uTxIfperc,
+        		xtinfo->link_speed,
         		sPinfo[pid].if_name);
     }
     else {
@@ -166,7 +177,9 @@ int stats_ifport_scale(xstatsinfo *xtinfo, uint8_t pid)
                 sPinfo[pid].if_name, if_info.cIfup,
                 if_info.uRxPrcnt, if_info.uRxPrbyte,
                 if_info.uTxPrcnt, if_info.uTxPrbyte,
-                if_info.uRxPrbps, if_info.uTxPrbps);
+                if_info.uRxPrbps, if_info.uTxPrbps,
+                if_info.uRxIfperc, if_info.uTxIfperc,
+                xtinfo->link_speed);
     }
 
     ret = mn_MysqlQuery(sp_mysql, sql_str, NULL);

@@ -1,0 +1,6 @@
+1, push branch
+git checkout -b branchname
+git push -u origin HEAD
+
+2, 
+

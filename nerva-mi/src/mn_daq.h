@@ -20,6 +20,7 @@ int mn_daq_Init(ApDpLoadInfo *dpl, char *lcore_mask, uint64_t ap_lcores, char *i
 /*int mn_daq_WasStarted (void);
 int mn_daq_stop (void);*/
 void mn_daq_start(void);
+int mn_daq_get_mbuf(void *, uint8_t);
 void mn_daq_breakloop_ext(void);
 
 #endif /*__MN_DAQ_H__*/

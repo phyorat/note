@@ -1,4 +1,12 @@
 
+GEO_NAME_ID:
+MAX:  7909807
+MIN:  49518
+
+
+^^^^^&&&&&&&&&&_------>:  rte_malloc_get_socket_stats
+
+
 #118
 sudo ./surveyor --daq-var dpdk_c_args=1001 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor01 -i dpdk0#12@0
 sudo ./surveyor --daq-var dpdk_c_args=2 -c /etc/psi_nids_user/surveyor_etc/surveyor.conf -l /var/log/surveyor02 -i dpdk0#12@1
