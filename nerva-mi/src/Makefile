@@ -7,7 +7,7 @@ release: libminv.a minerva
 #Test-Debug
 #PUBLIB_DIR:=../../../PUBLIC_LIB
 #EXT_CFLAGS+=-I/usr/local/include_daq_206 -I$(PUBLIB_DIR)/include
-#EXT_LDFLAGS+=-L/usr/local/lib_daq_206
+#EXT_LDFLAGS+=-L/usr/local/lib_daq_206 -L$(PUBLIB_DIR)/lib
 #RTE_SDK=/home/lhzy01/git/surveyor/usi_midware/dpdk-stable-16.07.2
 #RTE_TARGET=build
 #Test-Debug End

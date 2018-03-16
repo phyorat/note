@@ -34,11 +34,11 @@ static MYSQL *sfssn_mysql = NULL;
 //static MYSQL *sfins_mysql = NULL;
 static MYSQL *sfstack_mysql = NULL;
 
-static const char *ipt_initfromdb = "select id,ip_src,ip_dst,tppflag,uppflag,tppflag_user,uppflag_user,pflag_other,sf_sta,geo_id,almflag from %s";
-static const char *ipt_insert = "insert into %s (sf_sta,ip_src,ip_dst,geo_id,direction,tv_start,tv_upd,cnt,bsize,syn,dns,"
-        "tppflag,uppflag,tppflag_user,uppflag_user,pflag_other,almflag) values(%u,%u,%u,%lu,%u,%u,%u,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u)";
-static const char *ipt_update = "update %s set sf_sta=%u,geo_id=%lu,direction=%u,tv_upd=%u,cnt=cnt+%lu,bsize=bsize+%lu,syn=syn+%lu,dns=dns+%lu,"
-        "tppflag=%lu,uppflag=%lu,tppflag_user=%lu,uppflag_user=%lu,pflag_other=%lu,almflag=%u where id=%lu";
+static const char *ipt_initfromdb = "select id,ip_src,ip_dst,tpp,upp,tpp_u,upp_u,p_other,sf_sta,geo_id,almflag,direc from %s";
+static const char *ipt_insert = "insert into %s (sf_sta,ip_src,ip_dst,geo_id,direc,tv_start,tv_upd,cnt,bsize,syn,dns,"
+        "tpp,upp,tpp_u,upp_u,p_other,almflag) values(%u,%u,%u,%lu,%u,%u,%u,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%lu,%u)";
+static const char *ipt_update = "update %s set sf_sta=%u,geo_id=%lu,direc=%u,tv_upd=%u,cnt=cnt+%lu,bsize=bsize+%lu,syn=syn+%lu,dns=dns+%lu,"
+        "tpp=%lu,upp=%lu,tpp_u=%lu,upp_u=%lu,p_other=%lu,almflag=%u where id=%lu";
 static const char *ipt_upd_almflag = "update %s set sf_sta=%u,geo_id=%lu,almflag=%u where id=%lu";
 //static const char *ipt_select = "select ip_src,ip_dst,tv_upd,cnt,syn from %s where id=%u";
 //static const char *ipt_delete = "delete from %s where id=%lu";
@@ -52,14 +52,29 @@ static const char *protp_insert = "insert into %s (ipt_id,ip_src,ip_dst,tv_upd,p
         "values(%lu,%u,%u,%u,%u,%u,%u,%u,%lu,%lu,%lu,%lu)";
 static const char *protp_set_pp_id = "SET @pp_id=LAST_INSERT_ID()";
 static const char *protp_update = "update %s set tv_upd=%u,cnt_vi=cnt_vi+%lu,bsz_vi=bsz_vi+%lu,"
-        "cnt_vo=cnt_vo+%lu,bsz_vo=bsz_vo+%lu,id=(select @pp_id := id) "
+        "cnt_vo=cnt_vo+%lu,bsz_vo=bsz_vo+%lu,id=(select @pp_id := id),reset=(select @rst := reset),reset=0 "
         "where ipt_id=%lu and proto=%u and port_idx=%u and user_set=%u ORDER BY id DESC LIMIT 1";
+static const char *protp_port_reset = "UPDATE %s SET port=%u,reset=1,cnt_vi=0,bsz_vi=0,cnt_vo=0,bsz_vo=0 "
+        "WHERE port_idx=%u and user_set=1";
 static const char *protp_scale_throw = "INSERT INTO %s (ipt_id,geo_id,pp_id,scl_cmb,tv_upd,cnt_vi,bsz_vi,cnt_vo,bsz_vo,direc) "
         "SELECT %u,%lu,@pp_id,%u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_vi=VALUES(cnt_vi),bsz_vi=VALUES(bsz_vi),"
         "cnt_vo=VALUES(cnt_vo),bsz_vo=VALUES(bsz_vo)";
 static const char *protp_scale_add = "INSERT INTO %s (ipt_id,geo_id,pp_id,scl_cmb,tv_upd,cnt_vi,bsz_vi,cnt_vo,bsz_vo,direc) "
-        "SELECT %u,%lu,@pp_id,%u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),cnt_vi=cnt_vi+VALUES(cnt_vi),bsz_vi=bsz_vi+VALUES(bsz_vi),"
-        "cnt_vo=cnt_vo+VALUES(cnt_vo),bsz_vo=bsz_vo+VALUES(bsz_vo)";
+        "SELECT %u,%lu,@pp_id,%u,%u,%u,%u,%u,%u,%u ON DUPLICATE KEY UPDATE tv_upd=VALUES(tv_upd),"
+        "cnt_vi=if(@rst=1,VALUES(cnt_vi),cnt_vi+VALUES(cnt_vi)),"
+        "bsz_vi=if(@rst=1,VALUES(bsz_vi),bsz_vi+VALUES(bsz_vi)),"
+        "cnt_vo=if(@rst=1,VALUES(cnt_vo),cnt_vo+VALUES(cnt_vo)),"
+        "bsz_vo=if(@rst=1,VALUES(bsz_vo),bsz_vo+VALUES(bsz_vo))";
+
+static const char *sfstack_apport_sys_truncate = "truncate approto_ports_system";
+static const char *sfstack_apport_sys_select = "select id from approto_ports_system";
+static const char *sfstack_apport_sys_insert = "insert into approto_ports_system (port, proto_type, approto_idx, approto, approto_desc) "
+        "values(%u, %u, %u, '%s', '%s')";
+static const char *sfstack_apport_user_select = "select port,proto_type,approto_idx,approto_desc,pp_switch,renew "
+        "from approto_ports_user order by id asc";
+static const char *sfstack_apport_user_flush = "update approto_ports_user set renew=0";
+static const char *sfstack_apport_user_insert = "insert into approto_ports_user (id, port, proto_type, approto_idx, approto_desc, pp_switch, renew) "
+        "values(%u, %u, %u, %u, '%s', %u, %u)";
 
 //static const char *geo_set_ipt_id = "SET @ipt_id=LAST_INSERT_ID()";
 /*static const char *geo_scale_throw = "INSERT INTO %s (geo_id,scl_cmb,tv_upd,cnt_up,bsz_up,cnt_dn,bsz_dn) "
@@ -104,10 +119,13 @@ static const char *scale_cmb_geo_table_name [] = {
         "SELECT @pp_id,%u,%u,%u,%u,%u,%u";*/
 //static const char *protp_delete = "delete from %s where ipt_id=%lu";
 
-static const char *stack_insert = "insert into %s (ps_id,name,port_idx,user,port,direction,cnt,bsz,bps) values(%u,'%s',%u,%u,%u,%u,%lu,%lu,%u)";
+static const char *stack_insert = "insert into %s (ps_id,name,port_idx,user,port,direction,cnt,bsz,bps) "
+        "SELECT %u,'%s',%u,%u,%u,%u,%lu,%lu,%u ON DUPLICATE KEY UPDATE "
+        "name=VALUES(name),port=VALUES(port),cnt=VALUES(cnt),bsz=VALUES(bsz),bps=VALUES(bps)";
 static const char *stack_update = "update %s set port=%u,cnt=%lu,bsz=%lu,bps=%u where ps_id=%u and direction=%u";
 static const char *stack_select = "SELECT ps_id,direction,cnt,bsz FROM %s ORDER BY ps_id ASC";
 static const char *stack_reset_bps = "update %s set bps=0";
+//static const char *stack_reset_port = "UPDATE %s SET name='%s',port=%u,cnt=0,bsz=0,bps=0 WHERE port_idx=%u and user=1";
 
 static const char *iptssn_pkt_sample = "INSERT INTO nfssn_track_hbpkt (ssn_id,ipt_id,tv_stamp,pkt_sample) VALUES(%lu,%lu,%u,'";
 
@@ -325,38 +343,33 @@ NetFlowDBTblName map_nf2dbtbl[] =
 };
 #endif
 
-static int sf_InitProtpSysUser(void)
+static int sf_InitProtpSys(MYSQL *ptsql)
 {
-    uint32_t row_idx;
-    int row_cnt, i, sql_ret;
-    //IPTet ip_tet;
+    int row_cnt, sql_ret;
     char sql[256] = "";
     MYSQL_RES *mysql_res = NULL;
-    MYSQL_ROW row;
     NetFLowPortProtoMap *p_ppmap;
-    uint64_t ppflag_user_renew = 0;
 
-    LogMessage("%s: Initializing\n", __func__);
-
-    //approto_ports_system tables
-    snprintf(sql, sizeof(sql), "truncate approto_ports_system");
-    mn_MysqlQuery(sf_mysql, sql, NULL);
-    snprintf(sql, sizeof(sql), "select id from approto_ports_system");
-    row_cnt = mn_MysqlSelectDbRes(sf_mysql, sql, &mysql_res);
+    //approto_ports-system tables
+    snprintf(sql, sizeof(sql), "%s", sfstack_apport_sys_truncate);
+    mn_MysqlQuery(ptsql, sql, NULL);
+    snprintf(sql, sizeof(sql), "%s", sfstack_apport_sys_select);
+    row_cnt = mn_MysqlSelectDbRes(ptsql, sql, &mysql_res);
     if ( row_cnt < 0 ) {
-        LogMessage("%s: get approto_ports_system table failed!\n", __func__);
+        LogMessage("%s: get approto_ports-system table failed!\n", __func__);
     }
     else if ( 0 == row_cnt ) {
         mysql_free_result(mysql_res);
-        mn_MysqlTransBegin(sf_mysql);
+        mn_MysqlTransBegin(ptsql);
 
         //Create Instance
         p_ppmap = map_netflow_portproto;
         sql_ret = 0;
         while ( p_ppmap->port > 0 ) {
-            snprintf(sql, sizeof(sql), "insert into approto_ports_system (port, proto_type, approto_idx, approto_desc) "
-                    "values(%u, %u, %u, '%s')", p_ppmap->port, p_ppmap->pro_bitset, p_ppmap->fp_index, p_ppmap->pp_name);
-            sql_ret = mn_MysqlQuery(sf_mysql, sql, NULL);
+            snprintf(sql, sizeof(sql), sfstack_apport_sys_insert,
+                    p_ppmap->port, p_ppmap->pro_bitset, p_ppmap->fp_index,
+                    map_netfow2dp[NETFLOW_STACK_APP_STEP+p_ppmap->fp_index].nf_name, p_ppmap->pp_name);
+            sql_ret = mn_MysqlQuery(ptsql, sql, NULL);
             if ( sql_ret )
                 break;
 
@@ -364,24 +377,37 @@ static int sf_InitProtpSysUser(void)
         }
         if ( sql_ret ) {
             LogMessage("%s: [%s] failed!\n", __func__, sql);
-            mn_MysqlTransRollback(sf_mysql);
+            mn_MysqlTransRollback(ptsql);
         }
         else {
-            mn_MysqlTransCommit(sf_mysql);
+            mn_MysqlTransCommit(ptsql);
         }
     }
 
-    LogMessage("%s: approto_ports_system sync, row_cnt %d!\n", __func__, row_cnt);
+    LogMessage("%s: approto_ports-system sync, row_cnt %d!\n", __func__, row_cnt);
 
-    //approto_ports_user tables
-    snprintf(sql, sizeof(sql), "select port,proto_type,approto_idx,approto_desc,pp_switch,renew "
-            "from approto_ports_user order by id asc");
-    row_cnt = mn_MysqlSelectDbRes(sf_mysql, sql, &mysql_res);
+    return 0;
+}
+
+static int sf_InitProtpUser(StatsFlowConfluDataPlane *sf_dp_ctl, MYSQL *ptsql, uint8_t re_init)
+{
+    uint32_t row_idx;
+    int row_cnt, i, sql_ret = 0;
+    char sql[256] = "";
+    MYSQL_ROW row;
+    MYSQL_RES *mysql_res = NULL;
+    NetFLowPortProtoMap *p_ppmap;
+
+    mn_MysqlTransBegin(ptsql);
+
+    //approto_ports-user tables
+    snprintf(sql, sizeof(sql), "%s", sfstack_apport_user_select);
+    row_cnt = mn_MysqlSelectDbRes(ptsql, sql, &mysql_res);
     if ( row_cnt < 0 ) {
-        LogMessage("%s: get approto_ports_user table failed!\n", __func__);
+        LogMessage("%s: get approto_ports-user table failed!\n", __func__);
     }
     else {
-        LogMessage("%s: approto_ports_user-row_cnt %d\n", __func__, row_cnt);
+        LogMessage("%s: approto_ports-user-row_cnt %d\n", __func__, row_cnt);
 
         row_idx = 0;
         p_ppmap = map_netflow_portproto_user;
@@ -397,64 +423,102 @@ static int sf_InitProtpSysUser(void)
                 p_ppmap->pp_index = row_idx;
 
                 //save reset-flag
-                if ( p_ppmap->pp_switch && p_ppmap->renew )
-                    ppflag_user_renew |= (0x01L<<row_idx);
+                if ( p_ppmap->pp_switch ) {
+                    if ( (0x02 & p_ppmap->renew) ) {    //Port number updated
+                        LogMessage("%s: renew stack port %u, deep layer %x\n", __func__,
+                                p_ppmap->port, p_ppmap->renew);
+                        if ( re_init ) {
+                            sf_dp_ctl->protp_user_port_reset_bm |= (0x01L<<row_idx);
+                        }
+                        else {  //Process startup
+                            snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), protp_port_reset,
+                                    map_nf2dbtbl[NF_PROTP].tbl_name, p_ppmap->port, p_ppmap->pp_index);
+                            if ( (sql_ret = mn_MysqlQuery(ptsql, sql_cfl_scl, NULL)) )
+                                break;
+                        }
+                    }
+
+                    reflect_netflow_protoport_reflect[p_ppmap->fp_index].pro_bitset |= p_ppmap->pro_bitset;
+                    reflect_netflow_protoport_reflect[p_ppmap->fp_index].ports_user |= (0x01L<<p_ppmap->pp_index);
+                }
 
                 p_ppmap++;
                 row_idx++;
-
-                reflect_netflow_protoport_reflect[p_ppmap->fp_index].pro_bitset |= p_ppmap->pro_bitset;
-                reflect_netflow_protoport_reflect[p_ppmap->fp_index].ports_user |= (0x01L<<p_ppmap->pp_index);
             }
 
             // The last records, set switch = 0
-            p_ppmap->pp_switch = 0;
+            //p_ppmap->pp_switch = 0;
 
             mysql_free_result(mysql_res);
 
-            //reset renew-flag
-            if ( ppflag_user_renew ) {
-                snprintf(sql, sizeof(sql), "update approto_ports_user set renew=0");
-                sql_ret = mn_MysqlQuery(sf_mysql, sql, NULL);
+            //reset renew-flag -- obsolete, py-handle it
+            /*if ( sf_dp_ctl->protp_user_renew ) {
+                snprintf(sql, sizeof(sql), "%s", sfstack_apport_user_flush);
+                sql_ret = mn_MysqlQuery(ptsql, sql, NULL);
                 if ( sql_ret ) {
                     LogMessage("%s: [%s] failed!\n", __func__, sql);
                     return -1;
                 }
-            }
+            }*/
         }
-        else {
+        else if ( !re_init ) {
             mysql_free_result(mysql_res);
-            mn_MysqlTransBegin(sf_mysql);
 
-            sql_ret = 0;
-            for ( i=0; i<(SF_MAX_PROT_PROTO_USER+1); i++ ) {
-                snprintf(sql, sizeof(sql), "insert into approto_ports_user (id, port, proto_type, approto_idx, approto_desc, pp_switch, renew) "
-                        "values(%u, %u, %u, %u, '%s', %u, %u)",
+            for ( i=0; i<SF_MAX_PROT_PROTO_USER; i++ ) {
+                snprintf(sql, sizeof(sql), sfstack_apport_user_insert,
                         i+1, p_ppmap->port, p_ppmap->pro_bitset, p_ppmap->fp_index, p_ppmap->pp_name,
                         p_ppmap->pp_switch, p_ppmap->renew);
-                sql_ret = mn_MysqlQuery(sf_mysql, sql, NULL);
+                sql_ret = mn_MysqlQuery(ptsql, sql, NULL);
                 if ( sql_ret )
                     break;
 
                 //p_ppmap++;
             }
-
-            if ( sql_ret ) {
-                LogMessage("%s: [%s] failed!\n", __func__, sql);
-                mn_MysqlTransRollback(sf_mysql);
-            }
-            else {
-                mn_MysqlTransCommit(sf_mysql);
-            }
+        }
+        else {
+            mysql_free_result(mysql_res);
         }
     }
+
+    if ( sql_ret ) {
+        LogMessage("%s: [%s] failed!\n", __func__, sql);
+        mn_MysqlTransRollback(ptsql);
+    }
+    else {
+        mn_MysqlTransCommit(ptsql);
+    }
+
+    return 0;
+}
+
+static int sf_InitProtpDb(StatsFlowConfluDataPlane *sf_dp_ctl, MYSQL *ptsql, uint8_t re_init)
+{
+    uint32_t row_idx;
+    int row_cnt, i, sql_ret;
+    //IPTet ip_tet;
+    char sql[256] = "";
+    MYSQL_RES *mysql_res = NULL;
+    MYSQL_ROW row;
+    NetFLowPortProtoMap *p_ppmap;
+
+
+    if ( re_init )
+        LogMessage("%s: (Re)Initializing\n", __func__);
+    else
+        LogMessage("%s: Initializing\n", __func__);
+
+    if ( !re_init ) {
+        sf_InitProtpSys(ptsql);
+    }
+
+    sf_InitProtpUser(sf_dp_ctl, ptsql, re_init);
 
     return 0;
 }
 
 static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
 {
-    uint8_t ppid, direction, fp_index;
+    uint8_t ppid, direction;//, fp_index;
     int row_cnt, i, j;
 	//IPTet ip_tet;
     char sql[256] = "";
@@ -488,6 +552,7 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
                 apnode.sf_sta = (uint32_t)strtoul(row[8], NULL, 10);
                 apnode.geo_index = strtoul(row[9], NULL, 10);
                 apnode.almflag = (uint32_t)strtoul(row[10], NULL, 10);
+                apnode.direction = (uint8_t)strtoul(row[11], NULL, 10);
                 apnode.aly_stat |= SFALY_IPT_ACTIVE|SFALY_IPT_INSPECT_PULSE;
                 apnode.scl_st[SF_SCALE_STAGE_META].cnt = 0;
                 apnode.scl_st[SF_SCALE_STAGE_META].bsz = 0;
@@ -597,9 +662,9 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
         //Create Instance
         for (i=0; i<NETFLOW_STACK_COUNT; i++) {
             if ( !cfl_stack[i].nd_swt )
-                break;
+                continue;
 
-            if ( i < NETFLOW_STACK_APP_STEP ) {
+            /*if ( i < NETFLOW_STACK_APP_STEP ) {
                 fp_index = i;
             }
             else {
@@ -607,12 +672,12 @@ static int sf_IptetInitFromDB(StatsFlowConfluDataPlane *sfdp_ctl)
                     fp_index = NETFLOW_STACK_APP_STEP + map_netflow_portproto[cfl_stack[i].port_idx].fp_index;
                 else
                     fp_index = NETFLOW_STACK_APP_STEP + map_netflow_portproto_user[cfl_stack[i].port_idx].fp_index;
-            }
+            }*/
 
             for (j=0; j<SF_STREAM_DIRECTION_TYPES; j++) {
                 snprintf(sql, sizeof(sql), stack_insert,
                         map_nf2dbtbl[NF_PROTO].tbl_name,
-                        i+1, map_netfow2dp[fp_index].nf_name,
+                        i+1, map_netfow2dp[cfl_stack[i].fp_seq].nf_name,
                         cfl_stack[i].port_idx, cfl_stack[i].np_user, cfl_stack[i].port,
                         j, 0L, 0L, 0);
                 if ( mn_MysqlQuery(sf_mysql, sql, NULL) ) {
@@ -741,7 +806,7 @@ static int sf_StackMergeFromDp(StatsFlowConfluDataPlane *sfdp_ctl, ProStackStatN
     //Network Stack Statistic
     for (i=0; i<NETFLOW_STACK_COUNT; i++) {
         if ( !cfl_stack[i].nd_swt )
-            break;
+            continue;
 
         for (j=0; j<SF_STREAM_DIRECTION_TYPES; j++) {
             cfl_stack[i].cnt[j] += pstack[i].cnt[j];
@@ -761,7 +826,7 @@ static int sf_StackResetBps(StatsFlowConfluDataPlane *sfdp_ctl)
     //Network Stack Statistic
     for (i=0; i<NETFLOW_STACK_COUNT; i++) {
         if ( !cfl_stack[i].nd_swt )
-            break;
+            continue;
         for (j=0; j<SF_STREAM_DIRECTION_TYPES; j++)
             cfl_stack[i].bps[j] = 0;
     }
@@ -1296,7 +1361,7 @@ static int sf_IptetSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl, uint16_t sock_id
 
 static int sf_StackSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl)
 {
-    uint8_t fp_index;
+    //uint8_t fp_index;
     int ret = 0;
     uint32_t i, j;
     ProtoStackStatsCflNodes *cfl_stack = (ProtoStackStatsCflNodes*)(&sfdp_ctl->stack);
@@ -1312,10 +1377,10 @@ static int sf_StackSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl)
 
     for (i=0; i<NETFLOW_STACK_COUNT; i++) {
         if ( !cfl_stack[i].nd_swt )
-            break;
+            continue;
 
         if ( cfl_stack[i].nd_new ) {
-            if ( i < NETFLOW_STACK_APP_STEP ) {
+            /*if ( i < NETFLOW_STACK_APP_STEP ) {
                 fp_index = i;
             }
             else {
@@ -1323,14 +1388,15 @@ static int sf_StackSyncToDB(StatsFlowConfluDataPlane *sfdp_ctl)
                     fp_index = NETFLOW_STACK_APP_STEP + map_netflow_portproto[cfl_stack[i].port_idx].fp_index;
                 else
                     fp_index = NETFLOW_STACK_APP_STEP + map_netflow_portproto_user[cfl_stack[i].port_idx].fp_index;
-            }
+            }*/
 
             for (j=0; j<SF_STREAM_DIRECTION_TYPES; j++) {
                 snprintf(sql_cfl_stack, sizeof(sql_cfl_stack), stack_insert,
                         map_nf2dbtbl[NF_PROTO].tbl_name,
-                        i+1, map_netfow2dp[fp_index].nf_name,
+                        i+1, map_netfow2dp[cfl_stack[i].fp_seq].nf_name,
                         cfl_stack[i].port_idx, cfl_stack[i].np_user, cfl_stack[i].port,
                         j, cfl_stack[i].cnt[j], cfl_stack[i].bsize[j], cfl_stack[i].bps[j]);
+                //LogMessage("%s: %s\n", __func__, sql_cfl_stack);
                 ret = mn_MysqlQuery(sfstack_mysql, sql_cfl_stack, NULL);
                 if ( ret )
                     break;
@@ -1617,17 +1683,11 @@ static void sf_DBIns_Closet(int *pfd)
     LogMessage("%s: will try reconnect\n", __func__);
 }
 
-static int sf_AlyUnsSend(int fd, void *data, int datalen, void *rbuf, int *rlen)
+static int sf_AlyUnsReceive(int fd, void *rbuf, int *rlen)
 {
     int ret;
     struct timeval tv;
     fd_set fdset;
-
-    ret = write(fd, data, datalen);
-    if ( ret < datalen ) {
-        //LogMessage("%s: write error\n", __func__);
-        return -1;
-    }
 
     //wait data back
     tv.tv_usec = 0;
@@ -1648,6 +1708,19 @@ static int sf_AlyUnsSend(int fd, void *data, int datalen, void *rbuf, int *rlen)
     return 0;
 }
 
+static int sf_AlyUnsSend(int fd, void *data, int datalen)
+{
+    int ret;
+
+    ret = write(fd, data, datalen);
+    if ( ret < datalen ) {
+        //LogMessage("%s: write error\n", __func__);
+        return -1;
+    }
+
+    return 0;
+}
+
 static int sf_DBInsAlyUns(int fd, /*uint32_t aly_type, uint64_t dbid*/
         SFAlySockSend *aly_data, uint64_t *aly_flag)
 {
@@ -1663,7 +1736,12 @@ static int sf_DBInsAlyUns(int fd, /*uint32_t aly_type, uint64_t dbid*/
     memset(alarm_flag_str, 0, sizeof(alarm_flag_str));
     aly_retlen = sizeof(alarm_flag_str);
 
-    ret = sf_AlyUnsSend(fd, aly_data, sizeof(SFAlySockSend), alarm_flag_str, &aly_retlen);
+    ret = sf_AlyUnsSend(fd, aly_data, sizeof(SFAlySockSend));
+    if ( ret < 0 ) {
+        return ret;
+    }
+
+    ret = sf_AlyUnsReceive(fd, alarm_flag_str, &aly_retlen);
     if ( ret < 0 ) {
         return ret;
     }
@@ -1684,6 +1762,20 @@ static int sf_DBInsAlyUns(int fd, /*uint32_t aly_type, uint64_t dbid*/
     return 0;
 }
 
+uint8_t sf_DBInsGetProtpSta(StatsFlowConfluDataPlane *sf_dp_ctl)
+{
+    if ( !sf_dp_ctl->protp_reconfig_idb ) {
+        return 1;    //request db-es sync, start sync-proc
+    }
+    else if ( sf_dp_ctl->protp_reconfig_idb & 0x02 ) {
+        sf_dp_ctl->protp_reconfig_idb &= ~0x02;
+        return 2;    //request db clear set flag, end sync-proc
+    }
+    else {
+        return 0;    //do nothing, in sync-proc
+    }
+}
+
 int sf_DBIns_Loop(void *dp_cfl)
 {
     uint8_t geo_map_step;
@@ -1701,6 +1793,8 @@ int sf_DBIns_Loop(void *dp_cfl)
     uint64_t sf_aly_flag[4];
     sigset_t sigset;
     SFAlySockSend aly_data;
+    IPTet rev_ipt;
+    time_t loop_tick_prev = time(NULL), loop_tick_now;
 
     sigemptyset(&sigset);
     sigaddset(&sigset, SIGPIPE);
@@ -1733,6 +1827,8 @@ int sf_DBIns_Loop(void *dp_cfl)
             sfGlobalInfo.cur_iptid = 0;
             sfGlobalInfo.cur_ssnid = 0;
         }
+
+        loop_tick_now = time(NULL);
 
         //IpTet Geo map, 100
         geo_map_step = 100;
@@ -1767,10 +1863,22 @@ int sf_DBIns_Loop(void *dp_cfl)
                     && (tnode_geo->sf_sta & SFALY_STA_FLAG_GEO) )
                 continue;
 
+            switch ( tnode_geo->direction ) {
+            case SF_STREAM_UP:
+                aly_data.id_2 = htonl(tnode_geo->tet.dst);
+                break;
+            case SF_STREAM_DOWN:
+                aly_data.id_2 = htonl(tnode_geo->tet.src);
+                break;
+            default:
+                LogMessage("%s: Aly(IPT-GEO) skip ipt_id %lu, direction %u.\n",
+                        __func__, tnode_geo->dbid, tnode_geo->direction);
+                continue;
+            }
             aly_data.type = htonl(SF_ALY_GEO_MAP);
             aly_data.pad[0] = htonl(tnode_geo->sf_sta);
             aly_data.id_1 = htonl(tnode_geo->dbid);
-            aly_data.id_2 = htonl(tnode_geo->dbid);
+
             uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
             if ( uns_ret < 0 ) {
                 LogMessage("%s: Aly(IPT-GEO) communication failed\n", __func__);
@@ -1833,7 +1941,12 @@ int sf_DBIns_Loop(void *dp_cfl)
             aly_data.type = htonl(sf_aly_type);
             aly_data.pad[0] = htonl(tnode->sf_sta);
             aly_data.id_1 = htonl(tnode->dbid);
-            aly_data.id_2 = htonl(tnode->dbid);
+            aly_data.id_2 = 0;
+            rev_ipt.src = tnode->tet.dst;
+            rev_ipt.dst = tnode->tet.src;
+            JHashIpTetCflGetDbid(sf_dp_ctl->h_tnode, &rev_ipt, &(aly_data.id_2), (sf_dp_ctl->nsock-1));
+            aly_data.id_2 = htonl(aly_data.id_2);
+
             uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
             if ( uns_ret < 0 ) {
                 LogMessage("%s: Aly(IPT) communication failed\n", __func__);
@@ -1855,7 +1968,7 @@ int sf_DBIns_Loop(void *dp_cfl)
             }
 
             tnode->aly_stat &= ~SFALY_IPT_INSPECT_PULSE;
-            ssn_hb_cnt += 10;
+            ssn_hb_cnt += 100;
         }
 
         //Session Inspection
@@ -1864,6 +1977,7 @@ int sf_DBIns_Loop(void *dp_cfl)
             aly_data.type = htonl(SF_ALY_PROTO_SESSION);
             aly_data.id_1 = htonl(sfGlobalInfo.max_iptid);
             aly_data.id_2 = htonl(sfGlobalInfo.max_ssnid);
+            aly_data.pad[0] = htonl(sf_DBInsGetProtpSta(sf_dp_ctl));
             uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
             if ( uns_ret < 0 ) {
                 LogMessage("%s: Aly(SSN) communication failed\n", __func__);
@@ -1874,18 +1988,31 @@ int sf_DBIns_Loop(void *dp_cfl)
             sfGlobalInfo.cur_ssnid = sfGlobalInfo.max_ssnid;
 
             ssn_hb_cnt = 0;
+            loop_tick_prev = loop_tick_now;
+
+            if ( 1 == sf_aly_flag[1] ) {
+                sf_dp_ctl->protp_reconfig_idb |= 0x01;
+                LogMessage("%s: Aly(Prop-Config) in-%lu\n", __func__, sf_aly_flag[1]);
+            }
         }
-        else if ( ssn_hb_cnt++ & 0x1000000 ) {  //Heart Beat, as ssn
+        else if ( loop_tick_now - loop_tick_prev > 10 ){//ssn_hb_cnt++ & 0x1000 ) {  //Heart Beat, as ssn
             ssn_hb_cnt = 0;
+            loop_tick_prev = loop_tick_now;
 
             aly_data.type = htonl(SF_ALY_PROTO_SESSION);
             aly_data.id_1 = htonl(sfGlobalInfo.max_iptid);
             aly_data.id_2 = htonl(sfGlobalInfo.max_ssnid);
+            aly_data.pad[0] = htonl(sf_DBInsGetProtpSta(sf_dp_ctl));
             uns_ret = sf_DBInsAlyUns(uns_fd, &aly_data, sf_aly_flag);
             if ( uns_ret < 0 ) {
                 LogMessage("%s: Aly(SSN) communication failed\n", __func__);
                 sf_DBIns_Closet(&uns_fd);
                 continue;
+            }
+
+            if ( 1 == sf_aly_flag[1] ) {
+                sf_dp_ctl->protp_reconfig_idb |= 0x01;
+                LogMessage("%s: Aly-HB(Prop-Config) in-%lu\n", __func__, sf_aly_flag[1]);
             }
         }
 
@@ -1915,6 +2042,66 @@ int sf_DBIns_Loop(void *dp_cfl)
     } while (1);
 
     close(uns_fd);
+
+    return 0;
+}
+
+int sf_CflMulCProtpUser(StatsFlowConfluDataPlane *sf_dp_ctl)
+{
+    DAQ_Filter_Config *protp_conf = (DAQ_Filter_Config *)sf_dp_ctl->protp_set;
+
+    protp_conf->uOperation = DAQ_SF_SET_CONFIG;
+    protp_conf->config_size = sizeof(map_netflow_portproto_user);
+    mn_daq_memcpy(protp_conf->content, map_netflow_portproto_user, sizeof(map_netflow_portproto_user));
+    mn_daq_multicast_msg((void*)protp_conf, DAQ_SF_SET_CONFIG);
+
+    return 0;
+}
+
+int sf_CflStackUserInit(StatsFlowConfluDataPlane *sf_dp_ctl)//, MYSQL *ptsql)
+{
+    int stack_i, sql_ret;
+    ProtoStackStatsCflNodes *pnode;
+
+    pnode = (ProtoStackStatsCflNodes*)&sf_dp_ctl->stack + NETFLOW_STACK_PROTP_SYS_STEP;
+
+    //User-Defined Ports
+    for (stack_i=0; stack_i<SF_MAX_PROT_PROTO_USER; stack_i++, pnode++) {
+        if ( !map_netflow_portproto_user[stack_i].pp_switch ) {
+            pnode->nd_swt = 0;
+            continue;
+        }
+
+        //pnode->nf_stack = map_netfow2dp[map_netflow_portproto_user[stack_i].fp_index].nf_stack;
+        //pnode->nf_type = map_netfow2dp[map_netflow_portproto_user[stack_i].fp_index].nf_type;
+        pnode->port = map_netflow_portproto_user[stack_i].port;
+        pnode->port_idx = map_netflow_portproto_user[stack_i].pp_index;
+        pnode->fp_seq = NETFLOW_STACK_APP_STEP + map_netflow_portproto_user[pnode->port_idx].fp_index;
+        pnode->nd_swt = 1;
+        pnode->np_user = 1;
+        pnode->nd_new = map_netflow_portproto_user[stack_i].renew;
+
+        if ( pnode->nd_new ) {
+            map_netflow_portproto_user[stack_i].renew = 0;
+            memset(pnode->cnt, 0, sizeof(pnode->cnt));
+            memset(pnode->bsize, 0, sizeof(pnode->bsize));
+            memset(pnode->bps, 0, sizeof(pnode->bps));
+/*
+            snprintf(sql_cfl_stack, sizeof(sql_cfl_stack), stack_reset_port,
+                    map_nf2dbtbl[NF_PROTO].tbl_name,
+                    map_netfow2dp[pnode->fp_seq].nf_name, pnode->port,
+                    pnode->port_idx);
+            sql_ret = mn_MysqlQuery(ptsql, sql_cfl_stack, NULL);
+            if ( sql_ret ) {
+                LogMessage("%s: [%s] failed!\n", __func__, sql_cfl_stack);
+                //break;
+            }*/
+        }
+
+        LogMessage("%s: valid ports %u, renew %x\n", __func__, pnode->port, pnode->nd_new);
+    }
+
+    LogMessage("%s: job done\n", __func__);
 
     return 0;
 }
@@ -1980,44 +2167,43 @@ int sf_CflInit(void *dp_cfl, uint16_t rsock, uint16_t nsock)
     pnode = (ProtoStackStatsCflNodes*)(&sf_dp_ctl->stack);
     nmap_idx = 0;
     for (stack_i=0; stack_i<FLOWSTA_NET_COUNT; stack_i++, nmap_idx++, pnode++) {
-        pnode->nf_stack = map_netfow2dp[nmap_idx].nf_stack;
-        pnode->nf_type = map_netfow2dp[nmap_idx].nf_type;
+        //pnode->nf_stack = map_netfow2dp[nmap_idx].nf_stack;
+        //pnode->nf_type = map_netfow2dp[nmap_idx].nf_type;
         pnode->port = 0;
         pnode->port_idx = NF_APPRO_NA_NET;
+        pnode->fp_seq = stack_i;
         pnode->nd_swt = 1;
         pnode->np_user = 0;
+        pnode->nd_new = 0;
     }
     for (stack_i=0; stack_i<FLOWSTA_PROTO_COUNT; stack_i++, nmap_idx++, pnode++) {
-        pnode->nf_stack = map_netfow2dp[nmap_idx].nf_stack;
-        pnode->nf_type = map_netfow2dp[nmap_idx].nf_type;
+        //pnode->nf_stack = map_netfow2dp[nmap_idx].nf_stack;
+        //pnode->nf_type = map_netfow2dp[nmap_idx].nf_type;
         pnode->port = 0;
         pnode->port_idx = NF_APPRO_NA_TRANS;
+        pnode->fp_seq = FLOWSTA_NET_COUNT + stack_i;
         pnode->nd_swt = 1;
         pnode->np_user = 0;
+        pnode->nd_new = 0;
     }
     for (stack_i=0; stack_i</*FLOWSTA_APPRO_COUNT*/NF_APPRO_COUNT; stack_i++, nmap_idx++, pnode++) {
-        pnode->nf_stack = map_netfow2dp[map_netflow_portproto[stack_i].fp_index].nf_stack;
-        pnode->nf_type = map_netfow2dp[map_netflow_portproto[stack_i].fp_index].nf_type;
+        //pnode->nf_stack = map_netfow2dp[map_netflow_portproto[stack_i].fp_index].nf_stack;
+        //pnode->nf_type = map_netfow2dp[map_netflow_portproto[stack_i].fp_index].nf_type;
         pnode->port = map_netflow_portproto[stack_i].port;
         pnode->port_idx = map_netflow_portproto[stack_i].pp_index;
+        pnode->fp_seq = NETFLOW_STACK_APP_STEP + map_netflow_portproto[pnode->port_idx].fp_index;
         pnode->nd_swt = 1;
         pnode->np_user = 0;
+        pnode->nd_new = 0;
     }
 
-    sf_InitProtpSysUser();
+    sf_InitProtpDb(sf_dp_ctl, sf_mysql, 0);
 
-    //User-Defined Ports
-    for (stack_i=0; stack_i<(SF_MAX_PROT_PROTO_USER+1); stack_i++, nmap_idx++, pnode++) {
-        if ( !map_netflow_portproto_user[stack_i].pp_switch )
-            break;
+    //Multi-cast protp-user to surve's
+    sf_CflMulCProtpUser(sf_dp_ctl);
 
-        pnode->nf_stack = map_netfow2dp[map_netflow_portproto_user[stack_i].fp_index].nf_stack;
-        pnode->nf_type = map_netfow2dp[map_netflow_portproto_user[stack_i].fp_index].nf_type;
-        pnode->port = map_netflow_portproto_user[stack_i].port;
-        pnode->port_idx = map_netflow_portproto_user[stack_i].pp_index;
-        pnode->nd_swt = 1;
-        pnode->np_user = 1;
-    }
+    //Init Stack-mem-db
+    sf_CflStackUserInit(sf_dp_ctl);//, sf_mysql);
 
     //Retrieve data from DB
     sf_IptetInitFromDB(sf_dp_ctl);
@@ -2027,20 +2213,47 @@ int sf_CflInit(void *dp_cfl, uint16_t rsock, uint16_t nsock)
 
 int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uint8_t db_sync)
 {
+    uint8_t db_sync_force = 0, stack_i;
     uint16_t sock_i;
     int ret_val = 0, db_ret = 0;
     StatsFlowConfluDataPlane *sf_dp_ctl = (StatsFlowConfluDataPlane*)dp_cfl;
+    static MYSQL **cfl_mysql;
+    ProtoStackStatsCflNodes *pnode;
 
     /*LogMessage("%s: dp_cfl %lx, merge dp %lx\n", __func__,
             (unsigned long)dp_cfl, (unsigned long)dp);*/
 
     switch ( dp_type ) {
     case MPOOL_STATSFLOW:
+        cfl_mysql = &sf_mysql;
+        break;
+    case MPOOL_SF_STACK:
+        cfl_mysql = &sfstack_mysql;
+        break;
+    default:
+        return ret_val;
+    }
+
+    //check DB connection
+    if ( NULL == *cfl_mysql ) {
+        if ( mn_MysqlConnect(cfl_mysql, server, database, user, password) ) {
+            *cfl_mysql = NULL;
+            LogMessage("%s: MysqlConnect(*cfl_mysql(%u)) error\n", __func__, dp_type);
+            return ret_val;
+        }
+    }
+
+    switch ( dp_type ) {
+    case MPOOL_STATSFLOW:
         if ( NULL != dp ) {
-            sf_IptetMergeFromDp(dp_cfl, dp);
+            if ( (((StatsFlowDataPlane*)dp)->sf_flag & STATSFLOW_SF_PROTP_UPD)
+                    && (sf_dp_ctl->protp_user_reset & 0x10) ) {
+                sf_dp_ctl->protp_sf_waitdp ++;
+                db_sync_force = 1;
+            }
         }
 
-        if ( db_sync ) {    //sync ip_tet
+        if ( db_sync || db_sync_force ) {    //sync ip_tet
             uint8_t scale_layer;
             uint8_t scale_reset[SF_SCALE_STAGE_MAX] = {0};
             uint32_t scale_flag;
@@ -2048,15 +2261,6 @@ int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uin
             time_t tv_cur = time(NULL), tv_scale[SF_SCALE_STAGE_MAX];
             struct tm ipt_tm_date, scl_tm_date;
             char scale_pr_buf[256] = {0}, buf[32];
-
-            //check DB connection
-            if ( NULL == sf_mysql ) {
-                if ( mn_MysqlConnect(&sf_mysql, server, database, user, password) ) {
-                    sf_mysql = NULL;
-                    LogMessage("%s: MysqlConnect(sf_mysql) error\n",__func__);
-                    break;
-                }
-            }
 
             //Meta Stock
             scale_layer = SF_SCALE_STAGE_META;
@@ -2066,8 +2270,24 @@ int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uin
             scale_flag = SF_GLOB_VAR_SCALE_L0;
             scale_reset[scale_layer] = 0;
 
+            if ( (1 == db_sync) && (0x01 == sf_dp_ctl->protp_user_reset) ) {
+                //Send protp_prot_user to surveyor
+                sf_CflMulCProtpUser(sf_dp_ctl);
+
+                //sub-surv config done
+                if ( sf_dp_ctl->protp_user_port_reset_bm > 0 )
+                    sf_dp_ctl->protp_user_reset |= 0x30;
+                else
+                    sf_dp_ctl->protp_user_reset |= 0x20;
+                sf_dp_ctl->protp_user_reset &= ~0x01;
+
+                LogMessage("%s: multicast(%x) protp-config to inc's.\n", __func__,
+                        sf_dp_ctl->protp_user_reset);
+            }
+
             if ( (sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_SCALE_DEEP_ALL)
-                    && (ipt_tm_date.tm_sec < SUR_SF_IPT_PP_SCALE_BASE_TIME) ) {
+                    && ((ipt_tm_date.tm_sec < SUR_SF_IPT_PP_SCALE_BASE_TIME)
+                            || db_sync_force ) ) {
                 if ( sfGlobalInfo.envset_scl_flag&SF_GLOB_VAR_SCALE_L1 ) {
                     scale_layer = SF_SCALE_STAGE_MIN;
                     tv_scale[scale_layer] = tv_cur - SUR_SF_IPT_PP_SCALE_VAL_MIN;  //step back
@@ -2079,12 +2299,16 @@ int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uin
                     LogMessage("%s: handle protp-scale, tm_hour %d, tm_min %d\n", __func__,
                             scl_tm_date.tm_hour, scl_tm_date.tm_min);
                 }
+
 #define SCL_DEBUG            (0x0f)
 #define SCL_LIT_DEBUG        (0x07)
+
                 //deep layer
                 if ( (0 == ipt_tm_date.tm_min)
 #ifdef SCL_DEBUG
-                        || (SCL_DEBUG == (SCL_DEBUG & ipt_tm_date.tm_min)) ) {
+                        || (SCL_DEBUG == (SCL_DEBUG & ipt_tm_date.tm_min))
+                        || ((sf_dp_ctl->protp_sf_waitdp > 0)
+                                && (sf_dp_ctl->protp_user_reset & 0x10)) ) {
 #else
                     ) {
 #endif
@@ -2103,7 +2327,7 @@ int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uin
                         scale_cmb[scale_layer] = (scl_tm_date.tm_mday*24+scl_tm_date.tm_hour)|(scale_layer-1)<<28;
                         scale_flag |= SF_GLOB_VAR_SCALE_L2;
 #ifdef SCL_DEBUG
-                        if ( SCL_DEBUG == ipt_tm_date.tm_min )
+                        if ( ipt_tm_date.tm_min <= SCL_DEBUG )
                             scale_reset[scale_layer] = 1;
                         else
                             scale_reset[scale_layer] = 0;
@@ -2180,6 +2404,41 @@ int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uin
                     for (sock_i=0; sock_i<sf_dp_ctl->nsock; sock_i++) {
                         db_ret = sf_IptetSyncToDB(dp_cfl, sock_i,
                                 tv_cur, tv_scale, scale_cmb, scale_reset, scale_flag);
+                        if ( MN_ERROR_DB == db_ret )
+                            break;
+                    }
+
+                    if ( (sf_dp_ctl->protp_sf_waitdp > 0)
+                            && (sf_dp_ctl->protp_user_reset & 0x10) ) {
+                        //User-Defined Ports
+                        pnode = (ProtoStackStatsCflNodes*)&sf_dp_ctl->stack + NETFLOW_STACK_PROTP_SYS_STEP;
+                        mn_MysqlTransBegin(sf_mysql);
+                        for (stack_i=0; stack_i<SF_MAX_PROT_PROTO_USER; stack_i++, pnode++) {
+                            if ( !(sf_dp_ctl->protp_user_port_reset_bm & (0x01L<<pnode->port_idx)) )
+                                continue;
+
+                            snprintf(sql_cfl_scl, sizeof(sql_cfl_scl), protp_port_reset,
+                                    map_nf2dbtbl[NF_PROTP].tbl_name, pnode->port, pnode->port_idx);
+                            if ( (db_ret = mn_MysqlQuery(sf_mysql, sql_cfl_scl, NULL)) )
+                                break;
+                            LogMessage("%s: reset protp_stats since user-defined port(idx %u) "
+                                    "re-configured(to %u).\n", __func__, pnode->port_idx, pnode->port);
+                        }
+                        if ( db_ret ) {
+                            mn_MysqlTransRollback(sf_mysql);
+
+                            LogMessage("%s: reset protp_stats - failed, try-later, port-bm 0x%lx.\n",
+                                    __func__, sf_dp_ctl->protp_user_port_reset_bm);
+                        }
+                        else {
+                            mn_MysqlTransCommit(sf_mysql);
+
+                            LogMessage("%s: reset protp_stats - done, affected port-bm 0x%lx.\n",
+                                    __func__, sf_dp_ctl->protp_user_port_reset_bm);
+                            sf_dp_ctl->protp_user_port_reset_bm = 0;
+                            sf_dp_ctl->protp_user_reset &= ~0x10;
+                            sf_dp_ctl->protp_sf_waitdp = 0;
+                        }
                     }
                 }
             }
@@ -2187,43 +2446,55 @@ int sf_Confluence(void *dp_cfl, void *dp, unsigned sock_id, uint8_t dp_type, uin
             //sf_IptetSyncToDB(dp_cfl, tv_cur, tv_scale, scale_cmb, scale_reset, scale_flag);
         }
 
-        if ( MN_ERROR_DB == db_ret ) {
-            if ( mn_MysqlResolve(&sf_mysql, server, database, user, password) ) {
-                sf_mysql = NULL;
-                LogMessage("%s: MysqlResolve(sf_mysql) error\n",__func__);
+        if ( NULL != dp ) {
+            sf_IptetMergeFromDp(dp_cfl, dp);
+        }
+        break;
+    case MPOOL_SF_STACK:
+        if ( (sf_dp_ctl->protp_reconfig_idb&0x01) && !sf_dp_ctl->protp_user_reset ) {
+            LogMessage("%s: Re-Init protp-config\n", __func__);
+            sf_InitProtpDb(sf_dp_ctl, *cfl_mysql, 1);
+            sf_dp_ctl->protp_user_reset = 0x01;
+
+            sf_dp_ctl->protp_ps_waitdp = 0;
+            sf_dp_ctl->protp_sf_waitdp = 0;
+            sf_dp_ctl->protp_reconfig_idb |= 0x02;
+            sf_dp_ctl->protp_reconfig_idb &= ~0x01;
+        }
+
+        if ( NULL != dp ) {
+            if ( (((ProStackStatNodesTbl*)dp)->ps_flag & STATSFLOW_SF_PROTP_UPD)
+                    && (sf_dp_ctl->protp_user_reset & 0x20) ) {
+                sf_dp_ctl->protp_ps_waitdp ++;
+                db_sync_force = 1;
             }
         }
 
-        break;
-    case MPOOL_SF_STACK:
+        if ( db_sync || db_sync_force ) {
+            db_ret = sf_StackSyncToDB(dp_cfl);
+            sf_StackResetBps(dp_cfl);
+
+            if ( sf_dp_ctl->protp_ps_waitdp > 0
+                    && (sf_dp_ctl->protp_user_reset & 0x20) ) {
+                sf_CflStackUserInit(sf_dp_ctl);//, *cfl_mysql);
+                sf_dp_ctl->protp_user_reset &= ~0x20;
+                sf_dp_ctl->protp_ps_waitdp = 0;
+            }
+        }
+
         if ( NULL != dp ) {
             sf_StackMergeFromDp(dp_cfl, dp);
         }
-
-        if ( db_sync ) {
-            //check DB connection
-            if ( NULL == sfstack_mysql ) {
-                if ( mn_MysqlConnect(&sfstack_mysql, server, database, user, password) ) {
-                    sfstack_mysql = NULL;
-                    LogMessage("%s: MysqlConnect(sfstack_mysql) error\n",__func__);
-                    break;
-                }
-            }
-
-            db_ret = sf_StackSyncToDB(dp_cfl);
-            sf_StackResetBps(dp_cfl);
-        }
-
-        if ( MN_ERROR_DB == db_ret ) {
-            if ( mn_MysqlResolve(&sfstack_mysql, server, database, user, password) ) {
-                sfstack_mysql = NULL;
-                LogMessage("%s: MysqlResolve(sfstack_mysql) error\n",__func__);
-            }
-        }
-
         break;
     default:
         break;
+    }
+
+    if ( MN_ERROR_DB == db_ret ) {
+        if ( mn_MysqlResolve(cfl_mysql, server, database, user, password) ) {
+            *cfl_mysql = NULL;
+            LogMessage("%s: MysqlResolve(sf_mysql) error\n",__func__);
+        }
     }
 
     return ret_val;

@@ -57,6 +57,7 @@ daq_dpdk_ring_collect mn_sf_daq_ring_coll [] =
 #endif
         {RING_DIGGER,        MR_SINGLETON,     DAQ_DP_RING_DG_INT,    16*8192, 0, DAQ_DPDK_DP_DIGGER},
         {RING_MSG_MASTER,    MR_SINGLETON,     DAQ_DP_RING_MASTER,    SUR_SF_RING_MSG_QUEUE_SIZE<<8, 0, DAQ_DPDK_DP_AP},
+        {RING_MSG_SUR,       MR_ALL_QUEUES,    DAQ_DP_RING_MSG_SV,    SUR_SF_RING_MSG_QUEUE_SIZE, 0, DAQ_DPDK_DP_AP},
 //        {RING_AP_MSG_DG,     MR_SINGLETON,     DAQ_DP_RING_MSG_DG,    SUR_SF_RING_MSG_QUEUE_SIZE, 0, DAQ_DPDK_DP_DIGGER},
         {RING_AP_MSG_SQ,     MR_SINGLETON,     DAQ_DP_RING_MSG_SQ,    SUR_SF_RING_MSG_QUEUE_SIZE, 0, DAQ_DPDK_DP_AP},
 //        {RING_AP_MSG_PT,     MR_SINGLETON,     DAQ_DP_RING_MSG_PT,    SUR_SF_RING_MSG_QUEUE_SIZE, 0, DAQ_DPDK_DP_AP},
@@ -167,10 +168,21 @@ NetFLowPortProtoMap map_netflow_portproto[NETFLOW_PORTPROTO_MAP_MAX] =
         {8081,      NF_PROTP_BS_TCP,                        NF_APPRO_HTTP_8081,    FLOWSTA_APPRO_HTTP,      "HTTP", 1, 0},
 //        {36688,     NF_PROTP_BS_TCP|NF_PROTP_BS_UDP,        NF_APPRO_QQ_36688,     FLOWSTA_APPRO_UNKNOWN,   "TX-Service", 1, 0},
         {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
+        {0,         0,                                      NF_APPRO_UNKNOWN,      FLOWSTA_APPRO_UNKNOWN,   "Unknown", 0, 0},
 };
 
 //Should load from database at startup of system
-NetFLowPortProtoMap map_netflow_portproto_user[NETFLOW_PORTPROTO_MAP_MAX] =
+NetFLowPortProtoMap map_netflow_portproto_user[SF_MAX_PROT_PROTO_USER] =
 {
         {0, 0, NF_APPRO_UNKNOWN, FLOWSTA_APPRO_UNKNOWN, "Unknown", 0, 0}
 };

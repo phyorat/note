@@ -172,6 +172,11 @@ int mn_daq_get_mbuf(void *mbufs, uint8_t pool_idx)
     return daq_sf_get_mbufs(daq_mod, daq_hand, mbufs, pool_idx);
 }
 
+int mn_daq_multicast_msg(void *mdata, daq_sf_req_type req_type)
+{
+    return daq_sf_mc_req(daq_mod, daq_hand, mdata, req_type);
+}
+
 void mn_daq_breakloop_ext(void)
 {
     daq_breakloop_ext(daq_mod);

@@ -49,6 +49,13 @@
 /*******FLOW STATS SCALE END********/
 
 
+/*******STACK STATS ********/
+#define NETFLOW_PORTPROTO_MAP_MAX       64
+#define SF_MAX_PROT_PROTO_USER          64  //obsolete this rule--last records is end flag
+#define SF_MAX_PROT_PROTO_USER_SHIFT    (6)
+/*******STACK STATS END********/
+
+
 /*******DEBUG********/
 //#define TCP_SSN_PKTGEN_DEBUG
 /*******DEBUG END********/
@@ -110,6 +117,7 @@ static inline int sf_switch_test_and_set_off(sf_atomic32_t *v)
 #define SF_NETPROTOPORT_BITMAP_ELEM     1024
 typedef struct __NetProtoPortIdBitmap
 {
+    uint8_t bi[SF_MAX_PROT_PROTO_USER];
     uint16_t stc[SF_NETPROTOPORT_BITMAP_ELEM];  //Step Count
     uint64_t bm[SF_NETPROTOPORT_BITMAP_ELEM];   //Bit Map
 } NetProtoPortIdBitmap;
@@ -180,13 +188,11 @@ typedef struct __NetFLowPortProtoMap
     uint8_t renew;
 } NetFLowPortProtoMap;
 
-#define NETFLOW_PORTPROTO_MAP_MAX       64
-#define SF_MAX_PROT_PROTO_USER          (NETFLOW_PORTPROTO_MAP_MAX-1)  //last records is end flag
-
 typedef struct __NetFlowPPmArray
 {
+    NetFLowPortProtoMap map_portproto_user[SF_MAX_PROT_PROTO_USER];
     NetFLowPortProtoMap map_portproto[NETFLOW_PORTPROTO_MAP_MAX];
-    NetFLowPortProtoMap map_portproto_user[NETFLOW_PORTPROTO_MAP_MAX];
+    NetFLowPortProtoMap map_portp_user_cache[SF_MAX_PROT_PROTO_USER];
 } NetFlowPPmArray;
 
 typedef struct __NetFlowProtoPortReflect
@@ -252,10 +258,10 @@ typedef enum
     NF_APPRO_HTTP_8080,    /*50*/
     NF_APPRO_HTTP_8081,    /*51*/
 //    NF_APPRO_QQ_36688,    /*52*/
-    NF_APPRO_COUNT,
-    NF_APPRO_UNKNOWN,    /*52*/
-    NF_APPRO_NA_NET,
-    NF_APPRO_NA_TRANS,
+    NF_APPRO_COUNT,      /*52*/
+    NF_APPRO_UNKNOWN,    /*53*/
+    NF_APPRO_NA_NET,     /*54*/
+    NF_APPRO_NA_TRANS,   /*55*/
 } app_proto_type;
 
 typedef enum
@@ -452,11 +458,12 @@ typedef struct _ProtoStackStatsNodes
 
 typedef struct _ProtoStackStats
 {
-	netflow_stack nf_stack;
-	uint32_t nf_type;
+	//netflow_stack nf_stack;
+	//uint32_t nf_type;
 	uint8_t nd_new;
 	uint8_t np_user;
-	uint16_t nd_swt;     //node switch
+	uint8_t nd_swt;     //node switch
+	uint8_t fp_seq;
 	uint16_t port_idx;
 	uint16_t port;
 	uint32_t bps[SF_STREAM_DIRECTION_TYPES];
@@ -464,24 +471,32 @@ typedef struct _ProtoStackStats
 	uint64_t bsize[SF_STREAM_DIRECTION_TYPES];
 } ProtoStackStatsCflNodes;
 
-#define NETFLOW_STACK_APP_STEP      (FLOWSTA_NET_COUNT+FLOWSTA_PROTO_COUNT)
-#define NETFLOW_STACK_COUNT         (FLOWSTA_NET_COUNT+FLOWSTA_PROTO_COUNT+NF_APPRO_COUNT+(SF_MAX_PROT_PROTO_USER+1))
+#define NETFLOW_STACK_APP_STEP              (FLOWSTA_NET_COUNT+FLOWSTA_PROTO_COUNT)
+#define NETFLOW_STACK_PROTP_SYS_STEP        (FLOWSTA_NET_COUNT+FLOWSTA_PROTO_COUNT+NETFLOW_PORTPROTO_MAP_MAX/*NF_APPRO_COUNT*/)
+#define NETFLOW_STACK_COUNT                 (FLOWSTA_NET_COUNT+FLOWSTA_PROTO_COUNT+NETFLOW_PORTPROTO_MAP_MAX/*NF_APPRO_COUNT*/+(SF_MAX_PROT_PROTO_USER))
 
 typedef struct __ProStackStatNodesTbl
 {
-	ProtoStackStatsNodes netsta[FLOWSTA_NET_COUNT];
-	ProtoStackStatsNodes prosta[FLOWSTA_PROTO_COUNT];
-	ProtoStackStatsNodes aprsta[/*FLOWSTA_APPRO_COUNT*/NF_APPRO_COUNT];
-	ProtoStackStatsNodes aprsta_user[SF_MAX_PROT_PROTO_USER+1];
+    ProtoStackStatsNodes netsta[FLOWSTA_NET_COUNT];
+    ProtoStackStatsNodes prosta[FLOWSTA_PROTO_COUNT];
+    ProtoStackStatsNodes aprsta[NETFLOW_PORTPROTO_MAP_MAX/*NF_APPRO_COUNT*/];   //Get un-recognized port
+    ProtoStackStatsNodes aprsta_user[SF_MAX_PROT_PROTO_USER];
+    uint64_t ps_flag;
 } ProStackStatNodesTbl;
 
 typedef struct __ProStackConfluenceTbl
 {
 	ProtoStackStatsCflNodes netsta[FLOWSTA_NET_COUNT];
 	ProtoStackStatsCflNodes prosta[FLOWSTA_PROTO_COUNT];
-	ProtoStackStatsCflNodes aprsta[/*FLOWSTA_APPRO_COUNT*/NF_APPRO_COUNT];
-	ProtoStackStatsCflNodes aprsta_user[SF_MAX_PROT_PROTO_USER+1];
+	ProtoStackStatsCflNodes aprsta[NETFLOW_PORTPROTO_MAP_MAX/*NF_APPRO_COUNT*/];   //Get un-recognized port
+	ProtoStackStatsCflNodes aprsta_user[SF_MAX_PROT_PROTO_USER];
 } ProStackConfluenceTbl;
+
+typedef struct __StackProtpConfig
+{
+    uint32_t item_cnt;
+    void *data_conf;
+} StackProtpConfig;
 
 //Protocol session
 /*typedef enum
@@ -813,8 +828,14 @@ typedef struct __StatsFlowNodeExp
     PktQuinTuple pkt_qt;
 } StatsFlowNodeExp;
 
+typedef enum
+{
+    STATSFLOW_SF_PROTP_UPD = 0x01,
+} StatsFlowSfFlag;
+
 typedef struct __StatsFlowDataPlane
 {
+    uint64_t sf_flag;
     SSNProtoNodeHaTbl *p_hnode;
     SSNProtoNodePool *p_snode;
     IPTetStatNodeHaTbl h_tnode;//0x40000*8
@@ -872,6 +893,12 @@ typedef struct __SSNProtoCflNodePool {
 typedef struct _StatsFlowConfluDataPlane
 {
     uint16_t nsock;
+    volatile uint8_t protp_reconfig_idb;
+    volatile uint8_t protp_user_reset;
+    uint64_t protp_sf_waitdp;
+    uint64_t protp_ps_waitdp;
+    uint64_t protp_user_port_reset_bm;
+    uint8_t protp_set[4096];
     SSNProtoNodeHaTbl *p_hnode[MAX_SSNPROTO_CFL_NODEPOOLS];
     SSNProtoNodePool *p_snode[MAX_SSNPROTO_CFL_NODEPOOLS];
     IPTetConfluenceNodeHaTbl h_tnode[DAQ_DP_MP_NUMAEX_NODE_NUM];
@@ -886,6 +913,7 @@ typedef struct _StatsFlowConfluDataPlane
  */
 typedef struct _CounterNetFlow
 {
+    uint8_t dpProtpBMReset;             //user-port configured/changed
     int fd_timer_sf;
     int fd_timer_stack;
     int fd_epoll;
@@ -1008,14 +1036,8 @@ static inline void jHashProtoPortDupNode(ProtoPortNode *dst, const ProtoPortNode
 
 static inline void jIptetAppendPpNode(IPTetStatNode *ipt_node, ProtoPortNode *pp_node)
 {
-    if ( ipt_node->pp_node ) {
-        pp_node->pnxt = ipt_node->pp_node;
-        ipt_node->pp_node = pp_node;
-    }
-    else {
-        pp_node->pnxt = NULL;
-        ipt_node->pp_node = pp_node;
-    }
+    pp_node->pnxt = ipt_node->pp_node;
+    ipt_node->pp_node = pp_node;
 }
 
 static inline int JHashProPortAdd(ProtoPortNodeHaTbl *hanodes, ProtoPortNodePool *nodepool,
@@ -1121,17 +1143,8 @@ static inline SSNProtoStatsNode * SfSSNProtoNodeGet(SSNProtoNodePool *nodepool, 
 
 static inline void jSSNProtoAppendNode(IPTetStatNode *ipt_node, SSNProtoStatsNode *pp_node)
 {
-    if ( NULL == ipt_node )
-        return;
-
-    if ( ipt_node->ssn_node ) {
-        pp_node->snxt = ipt_node->ssn_node;
-        ipt_node->ssn_node = pp_node;
-    }
-    else {
-        pp_node->snxt = NULL;
-        ipt_node->ssn_node = pp_node;
-    }
+    pp_node->snxt = ipt_node->ssn_node;
+    ipt_node->ssn_node = pp_node;
 }
 
 static inline void jSSNProtoNodeQTDup(PktQuinTuple *qt_dst, PktQuinTuple *qt_src)
@@ -1453,6 +1466,15 @@ static inline int JHashIpTetAdd(IPTetStatNodeHaTbl *hanodes, IPTetStatNodePool *
     return nsock_idx;
 }
 
+static inline void JDIstResetNodes(StatsFlowDataPlane *pSfDpNodes)
+{
+    pSfDpNodes->tnode.npidx = 0;
+    memset(&pSfDpNodes->h_tnode, 0, sizeof(IPTetStatNodeHaTbl));
+
+    pSfDpNodes->pnode.npidx = 0;
+    memset(&pSfDpNodes->h_pnode, 0, sizeof(ProtoPortNodeHaTbl));
+}
+
 /*static inline int JHashIpTetCflSetExp(IPTetCflStatNode **hamap, IPTetConfluenceNodePool *nodepool,
         IPTet *tet, uint32_t targ_dbid)
 {
@@ -1516,14 +1538,19 @@ static inline int JHashIpTetCflDel(IPTetConfluenceNodeHaTbl *hanodes, IPTetConfl
     return -1;
 }
 
-static inline int JHashIpTetCflGetDbid(IPTetCflStatNode **hamap, const IPTet *iptet, uint64_t *ipt_dbid)
+static inline int JHashIpTetCflGetDbid(IPTetConfluenceNodeHaTbl *hanodes,
+        const IPTet *iptet, uint64_t *ipt_dbid, uint16_t nsock_mask)
 {
+    uint16_t nsock_idx;
     uint32_t HashVal;
     IPTetCflStatNode **jHead;
     IPTetCflStatNode *tNode;
 
     HashVal = jhash(iptet, sizeof(IPTet), 0);
-    jHead = hamap + (HashVal&IPTET_CONFLUENCE_HASHSZ_MASK);
+    nsock_idx = HashVal&nsock_mask;
+
+    jHead = ((IPTetConfluenceNodeHaTbl*)hanodes)[nsock_idx].hatbl +
+            ( HashVal & (((IPTetConfluenceNodeHaTbl*)hanodes)[nsock_idx].size-1) );
     tNode = *jHead;
 
     //New Node, Not In Hash List

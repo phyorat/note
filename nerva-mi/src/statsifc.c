@@ -137,8 +137,13 @@ int stats_ifport_scale(xstatsinfo *xtinfo, uint8_t pid)
     if_info.uTxPrbps = xtinfo->uTxPrbyte - sPinfo[pid].uTxPrbyte;
 
     if ( (1 == if_info.cIfup) && (xtinfo->link_speed > 0) ) {
-        if_info.uRxIfperc = (float)(if_info.uRxPrbps*25)/(float)(xtinfo->link_speed*32768);
-        if_info.uTxIfperc = (float)(if_info.uTxPrbps*25)/(float)(xtinfo->link_speed*32768);
+        //bps * 8 * 84[Eth-frame-len] * 100 / (link_speed * 1024 * 1024 * 64[ip-pkt-len])
+        if_info.uRxIfperc = (float)(if_info.uRxPrbps*525)/(float)(xtinfo->link_speed*524288);
+        if ( if_info.uRxIfperc > 100.00 )
+            if_info.uRxIfperc = 100.00;
+        if_info.uTxIfperc = (float)(if_info.uTxPrbps*525)/(float)(xtinfo->link_speed*524288);
+        if ( if_info.uTxIfperc > 100.00 )
+            if_info.uTxIfperc = 100.00;
     }
     else {
         if_info.uRxIfperc = 0;

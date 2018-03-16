@@ -85,8 +85,9 @@ int main(int argc, char *argv[])
 {
     uint8_t i, log_daemon = 0;
     uint8_t sur_c, numa_maps_c = 0;
+    uint8_t numa_node_c = 0, numa_dist_node_c = 0, dist_i;
     uint64_t pkt_count = 0, pkts_prev = 0;
-    uint64_t lcore_utl = 0, numa_node_c = 0;
+    uint64_t lcore_utl = 0;
     struct rte_ring *pkt_mbuf_ring;
     struct rte_mbuf *pkt_mp;
     struct timespec t_elapse;
@@ -120,10 +121,15 @@ int main(int argc, char *argv[])
             if ( i<argc )
                 lcore_utl = strtoul(argv[i], NULL, 16);
             break;
+        case 'd':
+            i++;
+            if ( i<argc )
+                numa_dist_node_c = (uint8_t)strtoul(argv[i], NULL, 10);
+            break;
         case 'N':
             i++;
             if ( i<argc )
-                numa_node_c = strtoul(argv[i], NULL, 10);
+                numa_node_c = (uint8_t)strtoul(argv[i], NULL, 10);
             break;
         case 'M':
             log_daemon = 1;
@@ -175,6 +181,17 @@ int main(int argc, char *argv[])
     syslog(LOG_NOTICE, "%s: Numa Node Number: %u\n", prog_name, dpl.nsock);
 
     dpl.npool = mn_sf_daq_mbuf_get_count();
+    if ( numa_dist_node_c > 0 ) {
+        for ( dist_i=0; dist_i<dpl.npool; dist_i++ ) {
+            if ( MPOOL_STATSFLOW == mn_sf_daq_mbuf_coll[dist_i].type ) {
+                mn_sf_daq_mbuf_coll[dist_i].poolsize = numa_dist_node_c;
+                syslog(LOG_NOTICE, "%s: Set distributed sf-nodes: %u\n",
+                        prog_name, dpl.nsock);
+                break;
+            }
+        }
+    }
+
     dpl.nring = mn_sf_daq_ring_get_count();
     dpl.ap_name = prog_name;
     dpl.mpools = mn_sf_daq_mbuf_coll;

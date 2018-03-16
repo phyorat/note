@@ -30,6 +30,6 @@
 
 void sf_PktInspcProc(Packet *p);
 int sf_PktInspection(/*uint32_t ins_dev_idx, */uint64_t lcore);
-void sf_PktInsCheckOp(void);
+int sf_PktInsCheckOp(void);
 
 #endif	/*__STATSFLOW_H__*/
