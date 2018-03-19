@@ -1,0 +1,23 @@
+#!/bin/bash
+
+#This Global Config for Surveyor to adapt diffrent hardware and database, etc.
+
+#dpdk power service type: PMD; MSI-X drived PMD -- Mutual Exclution!
+export SEAL=y
+export SEALION=n
+
+# DAQ
+export BUILD_DAQ_WITH_DPDK=y
+
+#Surveyor Buf-Ring Setup for Digger: Default V107; set to "y" for Surveyor_200
+export BUILD_SUR_MBUF_RING=y
+export BUILD_SP_DIGGER_MULTI_QUEUES=y
+
+#Database election: Mysql; ElasticSearch -- Mutual Exclution!
+export BS_GEN_DB_MYSQL=y
+export BS_GEN_DB_ES=y
+
+#Squirrel, spooler output with Mpool-Ring.
+export BS_GEN_SPO_DB_MYSQL=n
+export BS_GEN_SPO_MPOOL_RING=y
+

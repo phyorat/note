@@ -1,0 +1,1198 @@
+<?php
+include_once 'common.php';
+include_once 'sys_common.php';
+include_once 'audit.php';
+
+
+function BuildDetailTemplate()
+{
+	$response = array(
+		'status'=>REQ_STATUS_SUCCESS,
+		'operation'=>REQ_OPERATION_SUCCESS,
+		'total'=>0,
+		'data'=>array()
+	);
+	return $response;
+}
+
+if (! isset($_SERVER['REQUEST_METHOD']))
+{
+	SendResponse();
+	debug("request should specify request_method");
+}
+else
+{
+	session_write_close();
+	$method = $_SERVER['REQUEST_METHOD'];
+
+	if ($method != 'POST')
+	{
+		SendResponse();
+		debug("method must be post");
+	}
+	else
+	{
+		$validated = ValidateSession();
+		if (200 != $validated)
+		{
+			SendError($validated);
+			exit;
+		}
+	
+		$response = array(
+			'status'=>REQ_STATUS_SUCCESS,
+			'operation'=>REQ_OPERATION_FAILURE,
+		);
+
+		$response = BuildDetailTemplate();
+		$req = file_get_contents('php://input');
+		$nfq_data = json_decode($req, true);//convert to associative array^M
+
+		
+		if ( 0 ) {//!array_key_exists('layer', $nfq_data) ) {
+			$response['desc'] = 'No layer defined.';
+			$response['operation'] = REQ_INVALID_PARAMETER;
+			echo json_encode($response, JSON_UNESCAPED_UNICODE);
+			$ret = false;
+		}
+		else if ( array_key_exists('geo_dimen', $nfq_data) ) {
+			if ( array_key_exists('scale_type', $nfq_data) ) {
+				if ( 0 == $nfq_data['geo_dimen'] )
+					$nfq_data['geo_info_group_citys'] = nf_query_geo_info(0, true);
+				else if ( 1 == $nfq_data['geo_dimen'] )
+					$nfq_data['geo_info_group_state'] = nf_query_geo_info(1, true);
+				$ret = nf_query_layer_x($nfq_data);
+			}
+			else {
+				$response['data'] = nf_query_geo_info($nfq_data['geo_dimen'], false);
+				$response['operation'] = REQ_OPERATION_SUCCESS;
+				#$response['total'] = intval($count);
+				#$response['size'] = $size;
+				#$response['offset'] = $offset;
+				echo json_encode($response, JSON_UNESCAPED_UNICODE);
+				$ret = true;
+			}
+		}
+		else if ( array_key_exists('geo_all', $nfq_data) ) {
+			$nfq_data['geo_info_group_state'] = nf_query_geo_info(0xff, true);
+			$ret = nf_query_layer_x($nfq_data);
+		}
+		else {
+			//$nfq_data['proto'] = '17';
+			//$nfq_data['scale_type'] = 4;	//DEBUG
+			//$nfq_data['ip_src'] = $nfq_data['s_ip'];
+			//$nfq_data['scale_date'] = '2017-09-18';
+			$ret = nf_query_layer_x($nfq_data);
+		}
+		//审计日志参数
+		$audit_log=array(
+					'action'=>'流量查询',
+					'type'=>'流量查询操作',
+					'status'=>$ret
+				);
+		AuditLogEs($audit_log);//审计日志
+
+		return $ret;
+	}
+}
+
+function nf_query_geo_info($geo_dimen, $r_ids)
+{
+	$geo_info = array();
+	$client=getClient();
+
+	if ( 0 == $geo_dimen ) {
+		$query = [
+			'index' => "geo_state",
+			'size' => 1000,
+			'body' =>["query"=>["term"=>["country_id"=>"1814991"]]]
+		];
+
+		$return = myOperation('search', $query, $client);
+		if($return['success']){
+			$result = $return['result'];
+			if ( $result["hits"]['total'] > 0 ) {
+				$geo_info_ids = array();
+				$geo_info_indexes = array();
+				foreach ( $result["hits"]['hits'] as $g_hit ) {
+					if ( false == $r_ids ) {
+						$geo_subdv_name = $g_hit['_source']['subdivision_cn'];
+						if ( "__" == $geo_subdv_name )
+							continue;
+
+						if ( !array_key_exists($geo_subdv_name, $geo_info) ) {
+							$geo_info[$geo_subdv_name] = array();
+							//$geo_info[$geo_subdv_name]['name'] = $geo_subdv_name;
+						}
+
+						$geo_city_name = $g_hit['_source']['city_cn'];
+						if ( "__" == $geo_city_name )
+							continue;
+
+						array_push($geo_info[$geo_subdv_name], 
+										//array(
+										//$g_hit['_source']['geo_index'],
+										$g_hit['_source']['city_cn']);
+					}
+					else {
+						$geo_subdv_name = $g_hit['_source']['subdivision_cn'];
+						if ( "__" == $geo_subdv_name )
+							continue;
+						$geo_city_name = $g_hit['_source']['city_cn'];
+						if ( "__" == $geo_city_name )
+							continue;
+
+						$geo_city_idx = ((float)($g_hit['_source']['geo_index']))&0xffffffff;
+						if ( !array_key_exists($geo_city_idx, $geo_info_indexes) ) {
+							$geo_info_indexes[$geo_city_idx] = $g_hit['_source']['city_cn'];
+							array_push($geo_info_ids, $geo_city_idx);
+						}
+					}
+				}
+
+				if ( $r_ids ) {
+					$geo_info['ids'] = $geo_info_ids;
+					$geo_info['idx'] = $geo_info_indexes;
+				}
+			}
+		}
+	}
+	else if ( 1 == $geo_dimen ) {
+		$query = [
+			'index' => "geo_state",
+			'size' => 1000,
+			'body' =>["query"=>["bool"=>['must_not'=>["term"=>["country_id"=>"1814991"]]]]]
+		];
+
+		//print_r($query);
+		$return = myOperation('search', $query, $client);
+		//print_r($return);
+		if($return['success']){
+			$result = $return['result'];
+			if ( $result["hits"]['total'] > 0 ) {
+				$geo_info_ids = array();
+				$geo_info_indexes = array();
+				foreach ( $result["hits"]['hits'] as $g_hit ) {
+					if ( false == $r_ids ) {
+						$geo_state_iso = array(//$g_hit['_source']['geo_index'], 
+									$g_hit['_source']['country_iso'], 
+									$g_hit['_source']['country_cn']);
+						if ( !in_array($geo_state_iso, $geo_info) ) {
+							array_push($geo_info, $geo_state_iso);
+						}
+					}
+					else {
+						$geo_state_idx = ((float)($g_hit['_source']['geo_index']))>>52;
+						if ( !array_key_exists($geo_state_idx, $geo_info_indexes) ) {
+							$geo_info_indexes[$geo_state_idx] = $g_hit['_source']['country_cn'];
+							array_push($geo_info_ids, $geo_state_idx);
+						}
+					}
+				}
+
+				if ( $r_ids ) {
+					$geo_info['ids'] = $geo_info_ids;
+					$geo_info['idx'] = $geo_info_indexes;
+				}
+			}
+		}
+	}
+	else {
+		$query = [
+			'index' => "geo_state",
+			'size' => 1000,
+			//'body' =>["query"=>["bool"=>['must_not'=>["term"=>["country_id"=>"1814991"]]]]]
+		];
+
+		//print_r($query);
+		$return = myOperation('search', $query, $client);
+		//print_r($return);
+		if($return['success']){
+			$result = $return['result'];
+			if ( $result["hits"]['total'] > 0 ) {
+				$geo_info_ids = array();
+				$geo_info_indexes = array();
+				foreach ( $result["hits"]['hits'] as $g_hit ) {
+					$geo_state_idx = ((float)($g_hit['_source']['geo_index']))>>52;
+					if ( !array_key_exists($geo_state_idx, $geo_info_indexes) ) {
+						$geo_info_indexes[$geo_state_idx] = $g_hit['_source']['country_cn'];
+						array_push($geo_info_ids, $geo_state_idx);
+					}
+				}
+
+				if ( $r_ids ) {
+					$geo_info['ids'] = $geo_info_ids;
+					$geo_info['idx'] = $geo_info_indexes;
+				}
+			}
+		}
+	}
+
+	unset($client);
+	return $geo_info;
+}
+
+function strstr_after($haystack, $needle, $case_insensitive = false)
+{
+    $strpos = ($case_insensitive) ? 'stripos' : 'strpos';
+    $pos = $strpos($haystack, $needle);
+    if (is_int($pos)) {
+        return substr($haystack, $pos + strlen($needle));
+    }
+    return FALSE;
+}
+
+function ntohl($str)
+{
+	$endian = unpack('I', pack('N', $str));
+	return $endian[1];
+}
+
+function htonl($str)
+{
+	$endian = unpack('I', pack('N', $str));
+	return $endian[1];
+}
+
+function nf_query_get_ip_list($ip_addrs)
+{
+	$ip_list = array();
+	
+	if ( FALSE == ($nf_netmask=strstr_after($ip_addrs, '/')) ) {
+		$ip_base_int = ip2long($ip_addrs);
+		array_push($ip_list, ntohl($ip_base_int));
+	}
+	else if ( $nf_netmask >= 24 && $nf_netmask <= 32 ) {
+		$start_ipc = 0;
+		/*if (24 == $nf_netmask)	//No x.x.x.0
+			$start_ipc = 1;*/
+
+		$nf_netmask = 32 - $nf_netmask;
+		$nm_raw = 0xffffffff;
+		$nm_raw_rev = 0x0;
+		for($i=0; $i<$nf_netmask; $i++) {
+			$nm_raw &= ~(0x01<<$i);
+			$nm_raw_rev |= (0x01<<$i);
+		}
+
+		$ip_base = strstr($ip_addrs, '/', true);
+		$ip_base_int = ip2long($ip_base) & $nm_raw;
+		if ( 0 == ($ip_base_int & 0xff) )	//ip end with '0', x.x.x.0
+			$start_ipc = 1;
+		//echo '0x'.$nm_raw_rev.', base '.$ip_base.', int '.$ip_base_int.'<br>';
+		for($i=$start_ipc; $i<=$nm_raw_rev; $i++) {
+			array_push($ip_list, ntohl($ip_base_int+$i));
+		}
+	}
+
+	return $ip_list;
+}
+
+function nf_query_get_proto($proto_str)
+{
+	if ( '6' == $proto_str )		//TCP
+		return 6;
+	else if ( '17' == $proto_str )	//UDP
+		return 17;
+	else if ( '1' == $proto_str )	//ICMP
+		return 1;
+	else
+		return 0;
+}
+
+function nf_query_get_proto_name($proto_str)
+{
+	if ( '6' == $proto_str )		//TCP
+		return 'tcp';
+	else if ( '17' == $proto_str )	//UDP
+		return 'udp';
+	else if ( '1' == $proto_str )	//ICMP
+		return 'icmp';
+	else
+		return '';
+}
+
+function nf_query_get_port_list($ports_str)
+{
+	$port_list = explode(',', $ports_str);//array();
+/*
+	if ( FALSE != ($port=strstr($ports_str, ',', true)) ) {
+		array_push($port_list, $port);
+	}
+
+	print_r($port_list);
+	echo "port list: "."<br>";
+*/
+	return $port_list;
+}
+
+function nf_query_get_country_id($country_iso)
+{
+//	$country = array();
+	$geo_info = array();
+	$geo_info_ids = array();
+	$geo_info_indexes = array();
+	$client=getClient();
+
+	foreach ($country_iso as $state_iso) {
+		$data = [
+			'index' => "geo_state",
+			'body' =>["query"=>["term"=>["country_iso"=>$state_iso]]]
+		];
+		$return = myOperation('search', $data, $client);
+		if ($return["success"]) {
+			$result = $return['result'];
+			if ( $result["hits"]['total'] > 0 ) {
+				/*array_push($country, array(
+							'id'=>$result["hits"]['hits'][0]['_source']['geo_index'],
+							'stgid'=>$result["hits"]['hits'][0]['_source']['country_id'],
+							'cn'=>$result["hits"]['hits'][0]['_source']['country_cn']));*/
+				foreach ( $result["hits"]['hits'] as $g_hit ) {
+					$geo_state_idx = ((float)($g_hit['_source']['geo_index']))>>52;
+					if ( !array_key_exists($geo_state_idx, $geo_info_indexes) ) {
+						$geo_info_indexes[$geo_state_idx] = $g_hit['_source']['country_cn'];
+						array_push($geo_info_ids, $geo_state_idx);
+					}
+				}
+			}
+		}
+	}
+	$geo_info['ids'] = $geo_info_ids;
+	$geo_info['idx'] = $geo_info_indexes;
+	unset($client);
+
+	return $geo_info;
+}
+
+function nf_query_get_subdivision_ids($state_iso, $subdivision_cn)
+{
+//	$subdivisions = array();
+	$geo_info = array();
+	$geo_info_ids = array();
+	$geo_info_indexes = array();
+	$client=getClient();
+
+	foreach ($subdivision_cn as $geo_subdv) {
+		$data = [
+			'index' => "geo_state",
+			//'body' =>["query"=>["term"=>["subdivision_en"=>$geo_subdv]]]
+			'body' =>['query'=>['bool'=>['must'=>[
+							'match'=>["country_id"=>"1814991"],
+							'match'=>["subdivision_cn"=>$geo_subdv]]]]]
+		];
+		$return = myOperation('search', $data, $client);
+		if ($return["success"]) {
+			$result = $return['result'];
+			if ( $result["hits"]['total'] > 0 ) {
+				$geo_subdv_id = $result["hits"]['hits'][0]['_source']['subdivision_id'];
+				if ( $geo_subdv_id > 0 ) {
+					/*array_push($subdivisions, array(
+							'id'=>$result["hits"]['hits'][0]['_source']['geo_index'],
+							'sdgid'=>$geo_subdv_id,
+							'stgid'=>$result["hits"]['hits'][0]['_source']['country_id'],
+							'cn'=>$result["hits"]['hits'][0]['_source']['subdivision_cn']));*/
+					foreach ( $result["hits"]['hits'] as $g_hit ) {
+						$geo_subdv_idx = (((float)($g_hit['_source']['geo_index']))>>32)&0xfffff;
+						if ( !array_key_exists($geo_subdv_idx, $geo_info_indexes) ) {
+							$geo_info_indexes[$geo_subdv_idx] = $g_hit['_source']['subdivision_cn'];
+							array_push($geo_info_ids, $geo_subdv_idx);
+						}
+					}
+				}
+			}
+		}
+	}
+	$geo_info['ids'] = $geo_info_ids;
+	$geo_info['idx'] = $geo_info_indexes;
+	unset($client);
+
+	return $geo_info;
+}
+
+function nf_query_get_city_ids($state_iso, $citys_cn)
+{
+//	$citys = array();
+	$geo_info = array();
+	$geo_info_ids = array();
+	$geo_info_indexes = array();
+	$client=getClient();
+
+	foreach ($citys_cn as $geo_city) {
+		$data = [
+			'index' => "geo_state",
+			//'body' =>["query"=>["term"=>["city_en"=>$geo_city]]]
+			'body' =>['query'=>['bool'=>['must'=>[
+							'match'=>["country_id"=>"1814991"],
+							'match'=>["city_cn"=>$geo_city]]]]]
+		];
+		$return = myOperation('search', $data, $client);
+		if ($return["success"]) {
+			$result = $return['result'];
+			if ( $result["hits"]['total'] > 0 ) {
+				$geo_city_id = $result["hits"]['hits'][0]['_source']['city_id'];
+				if ( $geo_city_id > 0 ) {
+					/*array_push($citys, array(
+							'id'=>$result["hits"]['hits'][0]['_source']['geo_index'],
+							'ctgid'=>$geo_city_id,
+							'sdgid'=>$result["hits"]['hits'][0]['_source']['subdivision_id'],
+							'stgid'=>$result["hits"]['hits'][0]['_source']['country_id'],
+							'cn'=>$result["hits"]['hits'][0]['_source']['city_cn']));*//*,
+							'logi'=>$result["hits"]['hits'][0]['_source']['longitude'],
+							'lati'=>$result["hits"]['hits'][0]['_source']['latitude']));*/
+					foreach ( $result["hits"]['hits'] as $g_hit ) {
+						$geo_citys_idx = ((float)($g_hit['_source']['geo_index']))&0xffffffff;
+						if ( !array_key_exists($geo_citys_idx, $geo_info_indexes) ) {
+							$geo_info_indexes[$geo_citys_idx] = $g_hit['_source']['city_cn'];
+							array_push($geo_info_ids, $geo_citys_idx);
+						}
+					}
+				}
+			}
+		}
+	}
+	$geo_info['ids'] = $geo_info_ids;
+	$geo_info['idx'] = $geo_info_indexes;
+	unset($client);
+
+	return $geo_info;
+}
+
+function nf_get_cmb_previous($cmb_cur, $layer)
+{
+	if ( 1 == $layer ) {
+		if ( $cmb_cur & 0xff )
+			$cmb_cur -= 1;
+		else if ( $cmb_cur & 0xff00 )
+			$cmb_cur = ($cmb_cur-0x100)|59;
+		else
+			$cmb_cur = 0x0700|59;
+	}
+	else if ( 2 == $layer ) {
+		if ( $cmb_cur & 0xff00 )
+			$cmb_cur -= 0x100;
+		else
+			$cmb_cur |= 0xA700;
+	}
+	else if ( 3 == $layer ) {
+		if ( $cmb_cur & 0xff0000 )
+			$cmb_cur -= 0x10000;
+		else
+			$cmb_cur |= idate('d', strtotime("last day of previous month"));
+	}
+	else if ( 4 == $layer ) {
+		if ( $cmb_cur & 0xf000000 )
+			$cmb_cur -= 0x1000000;
+		else
+			$cmb_cur |= 0xC000000;
+	}
+
+	return $cmb_cur;
+}
+
+function nf_query_layer_x($nfq_data)
+{
+	//Return Struct
+	$response = BuildDetailTemplate();
+	$count = 0;
+	$div_port = FALSE;
+
+	$conn = CreateConn();
+	if (!$conn)
+	{
+		$response['operation'] = REQ_INTERNAL_ERROR;
+		echo json_encode($response, JSON_UNESCAPED_UNICODE);
+		return false;
+	}
+	CharSet($conn, "utf8");
+	SelectDB($conn, MYSQL_DB);
+
+	//Get IP List
+	$is_ip_spec = false;
+	if ( array_key_exists('ip_src', $nfq_data) && !array_key_exists('ip_dst', $nfq_data) )
+	{
+		$ip_list_src = nf_query_get_ip_list($nfq_data['ip_src']);
+		$ip_list_dst = array();
+		array_push($ip_list_dst, 0);
+		$is_ip_spec = true;
+	}
+/*	else if ( !array_key_exists('s_ip', $nfq_data) && array_key_exists('d_ip', $nfq_data) )
+	{
+		$ip_list_dst = nf_query_get_ip_list($nfq_data['d_ip']);
+		$ip_list_src = array();
+		array_push($ip_list_src, 0);
+	}
+	else if ( array_key_exists('s_ip', $nfq_data) && array_key_exists('d_ip', $nfq_data) )
+	{
+		$ip_list_src = nf_query_get_ip_list($nfq_data['s_ip']);
+		$ip_list_dst = nf_query_get_ip_list($nfq_data['d_ip']);
+	}*/
+	else
+	{
+		$ip_list_src = array();
+		array_push($ip_list_src, 0);
+		$ip_list_dst = array();
+		array_push($ip_list_dst, 0);
+	}
+
+	//Get Trans-Portocol
+	if ( array_key_exists('proto', $nfq_data) ) {
+		$trans_proto = nf_query_get_proto($nfq_data['proto']);
+	}
+	else {
+		$trans_proto = 0;
+	}
+
+	//Get Port List
+	if ( array_key_exists('s_port', $nfq_data) ) {
+		$port_lists = nf_query_get_port_list($nfq_data['s_port']);
+		$port_vec = 1;
+	}
+	else if ( array_key_exists('d_port', $nfq_data) ) {
+		$port_lists = nf_query_get_port_list($nfq_data['d_port']);
+		$port_vec = 2;
+	}
+	else {
+		$port_lists = array();
+		array_push($port_lists, 0);
+		$port_vec = 0;
+	}
+
+	//Get Geo List
+	$geo_def = false;
+	//State
+	$geo_info_group = array();
+	if ( array_key_exists('geo_info_group_state', $nfq_data) ) {
+		$geo_info_group['state'] = $nfq_data['geo_info_group_state'];
+		$geo_def = true;
+	}
+	else if ( array_key_exists('geo_country', $nfq_data) ) {
+		$geo_info_group['state'] = nf_query_get_country_id($nfq_data['geo_country']);
+		$geo_def = true;
+	}
+	else {
+		$geo_country_lists = array();
+	}
+	//Subdivision
+	if ( array_key_exists('geo_subdivision', $nfq_data) ) {
+		$geo_info_group['subdv'] = nf_query_get_subdivision_ids('CN', $nfq_data['geo_subdivision']);
+		$geo_def = true;
+	}
+	else {
+		$geo_subdv_lists = array();
+	}
+	//Citys
+	if ( array_key_exists('geo_info_group_citys', $nfq_data) ) {
+		$geo_info_group['citys'] = $nfq_data['geo_info_group_citys'];
+		$geo_def = true;
+	}
+	else if ( array_key_exists('geo_city', $nfq_data) ) {
+		$geo_info_group['citys'] = nf_query_get_city_ids('CN', $nfq_data['geo_city']);
+		$geo_def = true;
+	}
+	else {
+		$geo_city_lists = array();
+	}
+	/*$geo_target = array();
+	if ( true == $geo_def ) {
+		foreach ($geo_country_lists as $state_nd) {
+			$state_nd['type'] = 1;
+			//array_push($geo_target, $state_nd);
+			$geo_target[$state_nd['id']] = $state_nd;
+		}
+		foreach ($geo_subdv_lists as $subdv_nd) {
+			$subdv_nd['type'] = 2;
+			//array_push($geo_target, $subdv_nd);
+			$geo_target[$subdv_nd['id']] = $subdv_nd;
+		}
+		foreach ($geo_city_lists as $city_nd) {
+			$city_nd['type'] = 3;
+			//array_push($geo_target, $city_nd);
+			$geo_target[$city_nd['id']] = $city_nd;
+		}
+	}*/
+
+	//Scale Type
+	if ( array_key_exists('scale_type', $nfq_data) ) {
+		$scale_type = $nfq_data['scale_type'];
+	}
+	else {
+		$scale_type = 0;
+	}
+
+/*        if(empty($json['offset']) || $json['offset'] <= 0)
+                $offset = 0;
+        else
+                $offset = $json['offset'];
+
+        if(empty($json['size']) || $json['size'] <= 0)
+                $size = 10;
+        else
+                $size = $json['size'];*/
+
+	//Scale Time-Spec
+	if ( array_key_exists('scale_date', $nfq_data) ) {
+		$if_shift_mod = false;
+		$tv_scl_start = strtotime($nfq_data['scale_date']);
+	}
+	else {
+		$if_shift_mod = true;
+		$tv_this = time();
+	}
+
+	//Timing-Scale Info
+	if ( 1 == $scale_type ) {
+		$tv_step_long = 60;
+		if ( true == $if_shift_mod ) {
+			$scl_cmb_cnt = 420;
+
+			$tv_scl_end = $tv_this - ($tv_this % $tv_step_long);
+			//$tv_scl_end -= $tv_step_long;
+
+			//$scl_cmb_last = ((idate('H', $tv_scl_end)&0x07)<<8) | idate('i', $tv_scl_end);
+			//$tv_scl_start = $tv_scl_end - 25200 + $tv_step_long;//7*3600
+			$tv_scl_start = $tv_scl_end - ($scl_cmb_cnt-1)*$tv_step_long;
+		}
+		else {
+			$scl_cmb_cnt = 420;
+			$tv_this = $tv_scl_start + $scl_cmb_cnt*$tv_step_long;
+			$tv_scl_end = $tv_this - $tv_step_long;
+		}
+
+		$query_flag = 1;//'scl_cmb&0x10000000=0';
+		$scl_cmb_layer = 1;
+		$scl_cmb_scope = 'tv_upd>='.$tv_scl_start.' AND tv_upd<='.$tv_scl_end;
+	}
+	else if ( 2 == $scale_type ) {
+		$tv_step_long = 3600;
+		if ( true == $if_shift_mod ) {
+			$scl_cmb_cnt = 72;
+
+			$tv_scl_end = $tv_this - ($tv_this % $tv_step_long);
+			//$tv_scl_end -= $tv_step_long;
+			//$tv_scl_start = $tv_scl_end - 259200 + $tv_step_long;//3*24*3600
+			$tv_scl_start = $tv_scl_end - ($scl_cmb_cnt-1)*$tv_step_long;
+		}
+		else {
+			$scl_cmb_cnt = 24;
+			$tv_this = $tv_scl_start + $scl_cmb_cnt*$tv_step_long;
+			$tv_scl_end = $tv_this - $tv_step_long;
+		}
+
+		$query_flag = 1;//'scl_cmb&0xf0000000=(1<<28)';
+		$scl_cmb_layer = 2;
+
+		$scl_cmb_last = (idate('d', $tv_scl_end)*24+idate('H', $tv_scl_end));//|(($scale_type-1)<<28);
+		if ( $scl_cmb_last >= $scl_cmb_cnt )
+			$scl_cmb_first = $scl_cmb_last - $scl_cmb_cnt;
+		else
+			$scl_cmb_first = (idate('w', $tv_scl_start)*24+idate('H', $tv_scl_start));//|(($scale_type-1)<<28);
+		if ( $scl_cmb_first < $scl_cmb_last )
+			$scl_cmb_scope = '(scl_cmb>='.$scl_cmb_first.' AND scl_cmb<='.$scl_cmb_last.')';
+		else
+			$scl_cmb_scope = '(scl_cmb>='.$scl_cmb_first.' OR scl_cmb<='.$scl_cmb_last.')';
+	}
+	else if ( 3 == $scale_type ) {
+		$tv_step_long = 86400;
+		if ( true == $if_shift_mod ) {
+			$scl_cmb_cnt = 30;
+
+			$tv_scl_end = $tv_this - 
+					(idate('s', $tv_this) + 
+					idate('i', $tv_this)*60 + 
+					idate('H', $tv_this)*3600);
+
+			//$scl_cmb_last = (idate('d', $tv_scl_end)<<16)|(($scale_type-1)<<28);
+			//$tv_scl_start = $tv_scl_end - 2592000 + $tv_step_long;//2505600;2592000;//29*24*3600
+			$tv_scl_start = $tv_scl_end - ($scl_cmb_cnt-1)*$tv_step_long;
+		}
+		else {
+			$tv_this = strtotime(date('Y-m', $tv_scl_start).' +1 month');
+			$scl_cmb_cnt = ($tv_this - $tv_scl_start)/$tv_step_long;
+			$tv_scl_end = $tv_this - $tv_step_long;
+		}
+
+		$query_flag = 1;//'scl_cmb&0xf0000000=(2<<28)';
+		$scl_cmb_layer = 3;
+
+		$scl_cmb_last = (idate('z', $tv_scl_end))|(($scale_type-1)<<28);
+		if ( $scl_cmb_last >= $scl_cmb_cnt )
+			$scl_cmb_first = $scl_cmb_last - $scl_cmb_cnt;
+		else
+			$scl_cmb_first = (idate('z', $tv_scl_start))|(($scale_type-1)<<28);
+		if ( $scl_cmb_first < $scl_cmb_last )
+			$scl_cmb_scope = '(scl_cmb>='.$scl_cmb_first.' AND scl_cmb<='.$scl_cmb_last.')';
+		else
+			$scl_cmb_scope = '(scl_cmb>='.$scl_cmb_first.' OR scl_cmb<='.$scl_cmb_last.')';
+	}
+	else if ( 4 == $scale_type ) {
+		$scl_cmb_cnt = 12;
+		if ( true == $if_shift_mod ) {
+			$tv_scl_end = $tv_this - 
+					(idate('s', $tv_this) +
+					idate('i', $tv_this)*60 +
+					idate('H', $tv_this)*3600 +
+					(idate('d')-1)*86400);
+
+			//$scl_cmb_last = (idate('m', $tv_scl_end))|(($scale_type-1)<<28);
+			$tv_scl_start = strtotime(idate('m', $tv_scl_end).'/01/'.idate('y', $tv_scl_end).' 00:00 -11 month');
+		}
+		else {
+			$tv_this = strtotime(idate('m', $tv_scl_start).'/01/'.idate('y', $tv_scl_start).' 00:00 +12 month');
+			$tv_scl_end = strtotime(idate('m', $tv_scl_start).'/01/'.idate('y', $tv_scl_start).' 00:00 +11 month');
+		}
+
+		$query_flag = 1;//'scl_cmb&0xf0000000=(3<<28)';
+		$scl_cmb_layer = 4;
+
+		$scl_cmb_last = (idate('m', $tv_scl_end)-1)|(($scale_type-1)<<28);
+		if ( $scl_cmb_last >= $scl_cmb_cnt )
+			$scl_cmb_first = $scl_cmb_last - $scl_cmb_cnt;
+		else
+			$scl_cmb_first = (idate('z', $tv_scl_start))|(($scale_type-1)<<28);
+		if ( $scl_cmb_first < $scl_cmb_last )
+			$scl_cmb_scope = '(scl_cmb>='.$scl_cmb_first.' AND scl_cmb<='.$scl_cmb_last.')';
+		else
+			$scl_cmb_scope = '(scl_cmb>='.$scl_cmb_first.' OR scl_cmb<='.$scl_cmb_last.')';
+	}
+	else {
+		$response['operation'] = REQ_INTERNAL_ERROR;
+		$response['desc'] = 'Invalid layer define.';
+		echo json_encode($response, JSON_UNESCAPED_UNICODE);
+		CloseConn($conn);
+		return false;
+	}
+
+	$scale_lx_table_name = array(
+		1 => 'nfprotp_stats_scale_l1',
+		2 => 'nfprotp_stats_scale_l2',
+		3 => 'nfprotp_stats_scale_l3',
+		4 => 'nfprotp_stats_scale_l4',
+	);
+
+	$scale_cron_table_name = array(
+		1 => 'nfproto_hour',
+		2 => 'nfproto_hour',
+		3 => 'nfproto_day',
+		4 => 'nfproto_month',
+	);
+
+	$scale_geo_table_name = array(
+		1 => 'nfiptet_geo_scale_l1',
+		2 => 'nfiptet_geo_scale_l2',
+		3 => 'nfiptet_geo_scale_l3',
+		4 => 'nfiptet_geo_scale_l4',
+	);
+
+	$scale_info_set = array(
+		'type' => $scale_type, 
+		'cnt' => $scl_cmb_cnt, 
+		'start' => $tv_scl_start, 
+		'end' => $tv_scl_end, 
+		'long' => $tv_step_long,
+	);
+
+	//Retrieve Data
+//	foreach ($ip_list_src as $ip_src) {
+	if ( true == $is_ip_spec ) {
+		$ip_src = $ip_list_src[0];
+//		foreach ($ip_list_dst as $ip_dst) {
+		if ( 0 != $port_vec || 0 != $trans_proto ) {
+//			foreach ($port_lists as $port) {
+
+			$sql_rsv = 'pp_id in (SELECT * FROM(SELECT id FROM nfprotp_stats WHERE ip_dst='.$ip_src;
+			$sql_snd = 'pp_id in (SELECT * FROM(SELECT id FROM nfprotp_stats WHERE ip_src='.$ip_src;
+
+			$sql_sf_ext = '';
+			//Proto
+			if ( 0 != $trans_proto ) {
+				$sql_sf_ext = $sql_sf_ext.' AND proto='.$trans_proto;
+			}
+			//Port
+			if ( 0 != $port_vec ) {
+				$port = $port_lists[0];
+				$sql_sf_ext = $sql_sf_ext.' AND port='.$port;
+			}
+			//Time Line
+			/*Skip instance which is not updated at query Start-Time-Line.*/
+			//$sql_sf_ext .= ' AND tv_upd>='.$tv_scl_start.' AND tv_upd<'.$tv_this.') AS id) AND ';
+			$sql_sf_ext .= ' AND tv_upd>='.$tv_scl_start.') AS id) AND ';
+
+			//Align
+			$sql_rsv = $sql_rsv.$sql_sf_ext;
+			$sql_snd = $sql_snd.$sql_sf_ext;
+
+			//Prev-Query
+			$sql_data_as = 'SELECT scl_cmb,sum(bsz_vi+bsz_vo) as bsz,max(tv_upd) as tu ';
+
+			//Scale Type
+			$sql_data_as .= 'FROM '.$scale_lx_table_name[$scale_type].' WHERE ';
+
+			//Post-Query
+			$sql_data_opt = $scl_cmb_scope.' AND ';
+			$sql_data_opt .= $query_flag.' GROUP BY scl_cmb ORDER BY tu DESC';
+
+			//Final SQL
+			$sf_stats[0] = $sql_data_as.$sql_rsv.$sql_data_opt;
+			$sf_stats[1] = $sql_data_as.$sql_snd.$sql_data_opt;
+			$query_cnt = 2;
+
+			$data_pool = nf_query_fill_data_pool($conn, $scale_info_set, $query_cnt, $sf_stats, "");
+			$response['data'] = $data_pool;
+			$count++;
+		}
+		else if ( true == $geo_def ) {
+			//echo "Geo Info";
+			//Geo Info/Condition
+			/*$data_pool = array();
+			foreach ($geo_target as $geo_node) {
+				if ( 1 == $geo_node['type'] ) {
+					$sql_geo_id = 'SELECT * FROM(SELECT geo_id FROM nfgeo_info WHERE state_gid='.$geo_node['stgid'].') AS geo';
+				}
+				else if ( 2 == $geo_node['type'] ) {
+					$sql_geo_id = 'SELECT * FROM(SELECT geo_id FROM nfgeo_info WHERE state_gid='.$geo_node['stgid'];
+					$sql_geo_id .= ' AND subdv_gid='.$geo_node['sdgid'].') AS geo';
+				}
+				else if ( 3 == $geo_node['type'] ) {
+					$sql_geo_id = 'SELECT * FROM(SELECT geo_id FROM nfgeo_info WHERE state_gid='.$geo_node['stgid'];
+					$sql_geo_id .= ' AND subdv_gid='.$geo_node['sdgid'];
+					$sql_geo_id .= ' AND city_gid='.$geo_node['ctgid'].') AS geo';
+				}
+				else {
+					$sql_geo_id = '1';
+				}*/
+			//IP-TET
+			$sql_ipt_pre = 'SELECT * FROM(SELECT id FROM nfiptet_stats WHERE';
+			$sql_rsv = ' ip_dst='.$ip_src.' AND tv_upd>='.$tv_scl_start.' AND direc=2';
+			$sql_snd = ' ip_src='.$ip_src.' AND tv_upd>='.$tv_scl_start.' AND direc=1';
+
+			$data_pool_type_sp = array();
+			$data_pool_type_sp['state'] = array();
+			$data_pool_type_sp['subdv'] = array();
+			$data_pool_type_sp['citys'] = array();
+			reset($geo_info_group);
+			while ($geo_group_this = current($geo_info_group)){
+				//Prev-Query
+				$geo_group_key = key($geo_info_group);
+				if ( 'state' == $geo_group_key ){
+					$geo_subpad = '(geo_id>>52)';
+				}
+				else if ( 'subdv' == $geo_group_key ){
+					$geo_subpad = '((geo_id>>32)&0xfffff)';
+				}
+				else if ( 'citys' == $geo_group_key ){
+					$geo_subpad = '(geo_id&0xffffffff)';
+				}
+				else {
+					break;
+				}
+				
+				$sql_geo_id_ser = implode(',', $geo_group_this['ids']);
+				$sql_ipt_post = ' AND '.$geo_subpad.' IN ('.$sql_geo_id_ser.')) AS ipt';
+
+				//Scale Type
+				$sql_data_as = 'SELECT scl_cmb,sum(bsz_vi+bsz_vo) as bsz,max(tv_upd) as tu,'.$geo_subpad.' as gid';
+				$sql_data_as .= ' FROM '.$scale_lx_table_name[$scale_type].' WHERE ';
+
+				//Post-Query
+				$sql_data_opt = $scl_cmb_scope.' GROUP BY gid,scl_cmb ORDER BY gid,tu DESC';
+
+				//Final SQL
+				$sf_stats[0] = $sql_data_as.'ipt_id IN ('.$sql_ipt_pre.$sql_snd.$sql_ipt_post.')  AND '.$sql_data_opt;
+				$sf_stats[1] = $sql_data_as.'ipt_id IN ('.$sql_ipt_pre.$sql_rsv.$sql_ipt_post.')  AND '.$sql_data_opt;
+				$query_cnt = 2;
+
+				$data_pool_type_sp[$geo_group_key] = nf_query_geo_list_data_pool($conn, 
+							$query_cnt, $sf_stats, 
+							$geo_group_this['idx']);
+				$count += count($data_pool_type_sp[$geo_group_key]);
+
+				/*$data_sub_pool = nf_query_fill_data_pool($conn, $scale_info_set, $query_cnt, $sf_stats, $geo_node['cn']);
+				foreach ( $data_sub_pool as $subp ) {
+					if ( 0 < ($subp['up'] + $subp['down']) ) {
+						array_push($data_pool, $subp);
+					}
+				}
+				$count++;*/
+
+				next($geo_info_group);
+			}
+			$data_pool_ex = array_merge($data_pool_type_sp['state'], $data_pool_type_sp['subdv']);
+			$data_pool = array_merge($data_pool_ex, $data_pool_type_sp['citys']);
+		}
+		else {
+			$sql_rsv = 'ipt_id in (SELECT * FROM(SELECT id FROM nfiptet_stats WHERE ip_dst='.$ip_src;
+			$sql_snd = 'ipt_id in (SELECT * FROM(SELECT id FROM nfiptet_stats WHERE ip_src='.$ip_src;
+			$sql_sf_ext = ' AND tv_upd>='.$tv_scl_start.') AS id) AND ';
+
+			//Align
+			$sql_rsv = $sql_rsv.$sql_sf_ext;
+			$sql_snd = $sql_snd.$sql_sf_ext;
+
+			//Prev-Query
+			$sql_data_as = 'SELECT scl_cmb,sum(bsz_vi+bsz_vo) AS bsz,MAX(tv_upd) AS tu ';
+
+			//Scale Type
+			$sql_data_as .= ' FROM '.$scale_lx_table_name[$scale_type].' WHERE ';
+
+			//Post-Query
+			$sql_data_opt = $scl_cmb_scope.' AND ';
+			$sql_data_opt .= $query_flag.' GROUP BY scl_cmb ORDER BY tu DESC';
+
+			//Final SQL
+			$sf_stats[0] = $sql_data_as.$sql_rsv.$sql_data_opt;
+			$sf_stats[1] = $sql_data_as.$sql_snd.$sql_data_opt;
+			$query_cnt = 2;
+
+			$data_pool = nf_query_fill_data_pool($conn, $scale_info_set, $query_cnt, $sf_stats, "");
+			$response['data'] = $data_pool;
+			$count++;
+		}
+	}
+	else {
+		if ( 0 != $port_vec || 0 != $trans_proto ) {
+			$sf_stats_cron = 'SELECT tv_upd AS tu, bsz_up, bsz_down FROM ';
+			$sf_stats_group = '';
+			$sf_stats_cron .= $scale_cron_table_name[$scale_type].' WHERE 1';
+
+			//Proto
+			if ( 0 != $trans_proto ) {
+				$sf_stats_cron .= ' AND proto='.$trans_proto;
+			}
+			//Port
+			if ( 0 != $port_vec ) {
+				$port = $port_lists[0];
+				$sf_stats_cron .= ' AND port='.$port;
+			}
+
+			$sf_stats_cron .= ' AND tv_upd>='.$tv_scl_start.' AND tv_upd<='.$tv_scl_end;
+			$sf_stats_cron .= $sf_stats_group.' ORDER BY tv_upd DESC';
+
+			$sf_stats[0] = $sf_stats_cron;
+			$sf_stats[1] = $sf_stats_cron;
+			$query_cnt = 1;
+
+			$data_pool = nf_query_fill_data_pool($conn, $scale_info_set, $query_cnt, $sf_stats, "");
+			$response['data'] = $data_pool;
+			$count++;
+		}
+		else if ( true == $geo_def ) {
+			//Geo Info/Condition
+			/*foreach ($geo_target as $geo_node) {
+				if ( 1 == $geo_node['type'] ) {
+					$sql_geo_id = 'SELECT * FROM(SELECT geo_id FROM nfgeo_info WHERE state_gid='.$geo_node['stgid'].') AS id';
+				}
+				else if ( 2 == $geo_node['type'] ) {
+					$sql_geo_id = 'SELECT * FROM(SELECT geo_id FROM nfgeo_info WHERE state_gid='.$geo_node['stgid'];
+					$sql_geo_id .= ' AND subdv_gid='.$geo_node['sdgid'].') AS id';
+				}
+				else if ( 3 == $geo_node['type'] ) {
+					$sql_geo_id = 'SELECT * FROM(SELECT geo_id FROM nfgeo_info WHERE state_gid='.$geo_node['stgid'];
+					$sql_geo_id .= ' AND subdv_gid='.$geo_node['sdgid'];
+					$sql_geo_id .= ' AND city_gid='.$geo_node['ctgid'].') AS id';
+				}
+				else {
+					$sql_geo_id = '1';
+				}*/
+			$data_pool_type_sp = array();
+			$data_pool_type_sp['state'] = array();
+			$data_pool_type_sp['subdv'] = array();
+			$data_pool_type_sp['citys'] = array();
+			reset($geo_info_group);
+			while ($geo_group_this = current($geo_info_group)){
+				//Prev-Query
+				$geo_group_key = key($geo_info_group);
+				if ( 'state' == $geo_group_key ){
+					$geo_subpad = '(geo_id>>52)';
+				}
+				else if ( 'subdv' == $geo_group_key ){
+					$geo_subpad = '((geo_id>>32)&0xfffff)';
+				}
+				else if ( 'citys' == $geo_group_key ){
+					$geo_subpad = '(geo_id&0xffffffff)';
+				}
+				else {
+					break;
+				}
+				
+				$sql_geo_id_ser = implode(',', $geo_group_this['ids']);
+				$sql_data_as = 'SELECT '.$geo_subpad.' as gid,SUM(bsz_up) AS bsz_up,SUM(bsz_dn) AS bsz_down,max(tv_upd) AS tu';
+
+				//Scale Type
+				$sql_data_as .= ' FROM '.$scale_geo_table_name[$scale_type];
+				//Set Geo_id
+				$sql_data_as .= ' WHERE '.$geo_subpad.' IN ('.$sql_geo_id_ser.')';
+
+				//Post-Query
+				$sql_data_as .= ' AND '.$scl_cmb_scope;
+				$sql_data_as .= ' GROUP BY gid,scl_cmb ORDER BY gid,tu DESC';
+
+				//Final SQL
+				$sf_stats[0] = $sql_data_as;
+				$sf_stats[1] = $sql_data_as;
+				$query_cnt = 1;
+
+				$data_pool_type_sp[$geo_group_key] = nf_query_geo_list_data_pool($conn, 
+							$query_cnt, $sf_stats, 
+							$geo_group_this['idx']);
+				$count += count($data_pool_type_sp[$geo_group_key]);
+
+				/*$data_sub_pool = nf_query_fill_data_pool($conn, $scale_info_set, $query_cnt, $sf_stats, $geo_node['cn']);
+				foreach ( $data_sub_pool as $subp ) {
+					if ( 0 < ($subp['up'] + $subp['down']) ) {*/
+						/*if ( 3 == $geo_node['type'] ) {
+							$subp['longitude'] = $geo_node['logi'];
+							$subp['latitude'] = $geo_node['lati'];
+						}*/
+						//array_push($data_pool, $subp);
+					/*}
+				}
+				$count++;*/
+				next($geo_info_group);
+			}
+			$data_pool_ex = array_merge($data_pool_type_sp['state'], $data_pool_type_sp['subdv']);
+			$data_pool = array_merge($data_pool_ex, $data_pool_type_sp['citys']);
+		}
+		else {
+			$sf_stats_cron = 'SELECT MAX(tv_upd) AS tu, SUM(bsz_up) AS bsz_up, SUM(bsz_down) AS bsz_down FROM ';
+			$sf_stats_group = ' GROUP BY dt_seq';
+			$sf_stats_cron .= $scale_cron_table_name[$scale_type].' WHERE 1';
+
+			$sf_stats_cron .= ' AND tv_upd>='.$tv_scl_start.' AND tv_upd<='.$tv_scl_end;
+			$sf_stats_cron .= $sf_stats_group.' ORDER BY tv_upd DESC';
+
+			$sf_stats[0] = $sf_stats_cron;
+			$sf_stats[1] = $sf_stats_cron;
+			$query_cnt = 1;
+
+			$data_pool = nf_query_fill_data_pool($conn, $scale_info_set, $query_cnt, $sf_stats, "");
+			$response['data'] = $data_pool;
+			$count++;
+		}
+	}
+
+
+	$response['data'] = $data_pool;
+	$response['operation'] = REQ_OPERATION_SUCCESS;
+	$response['total'] = intval($count);
+	#$response['size'] = $size;
+	#$response['offset'] = $offset;
+
+	echo json_encode($response, JSON_UNESCAPED_UNICODE);
+	CloseConn($conn);
+
+	return true;
+}
+
+function nf_query_geo_list_data_pool($conn, $query_cnt, $sf_stats, $geo_info_indexes)
+{
+	$data_pool = array();
+
+	//print_r($geo_info_indexes);
+	for ( $i=0; $i<$query_cnt; $i++ ) {
+		//echo $sf_stats[$i]."<br>";
+		$ipt_res = ExecuteSQL($conn, $sf_stats[$i]);
+		if (!$ipt_res || GetNumOfResultRows($ipt_res) == 0) {
+			return $data_pool;
+		}
+
+		while ( ($ipt_row_rsv=FetchAssocArray($ipt_res)) ) {
+			if (!array_key_exists($ipt_row_rsv['gid'], $geo_info_indexes))
+				continue;
+			$data_pool_key = ($ipt_row_rsv['gid']<<32)|$ipt_row_rsv['tu'];
+			if ( $query_cnt > 1 ) {
+				if ( 0 == $i ) {
+					$data_pool_cell = array();
+					$data_pool_cell['down'] = $ipt_row_rsv['bsz'];
+					$data_pool_cell['up'] = 0;
+				}
+				else {
+					if (!array_key_exists($data_pool_key, $data_pool)) {
+						$data_pool_cell = array();
+						$data_pool_cell['down'] = 0;
+					}
+					else {
+						$data_pool_cell = $data_pool[$data_pool_key];
+					}
+					$data_pool_cell['up'] = $ipt_row_rsv['bsz'];
+				}
+			}
+			else {
+				$data_pool_cell = array();
+				$data_pool_cell['up'] = $ipt_row_rsv['bsz_up'];
+				$data_pool_cell['down'] = $ipt_row_rsv['bsz_down'];
+			}
+			$data_pool_cell['exp'] = $geo_info_indexes[$ipt_row_rsv['gid']];
+			$data_pool_cell['tv'] = $ipt_row_rsv['tu'];
+			$data_pool[$data_pool_key] = $data_pool_cell;
+		}
+	}
+
+	return $data_pool;
+}
+
+function nf_query_fill_data_pool($conn, $scale_set, $query_cnt, $sf_stats, $sf_profile)
+{
+	//Init Data Pool
+	$data_pool = array();
+	$tv_scl_step_go = $scale_set['start'];
+	for ($i=$scale_set['cnt']; $i>0; $i--) {
+		$data_pool_cell = array();
+		$data_pool_cell['up'] = 0;
+		$data_pool_cell['down'] = 0;
+		$data_pool_cell['exp'] = $sf_profile;
+		if ( 4 == $scale_set['type'] ) {
+			$data_pool_cell['tv'] = strtotime(idate('m', $scale_set['end']).'/01/'.idate('y', $scale_set['end']).' 00:00 -'.($i-1).' month');
+		}
+		else {
+			$data_pool_cell['tv'] = $tv_scl_step_go;
+			$tv_scl_step_go += $scale_set['long'];
+		}
+
+		array_push($data_pool, $data_pool_cell);
+	}
+
+	//Setup Data Pool
+	for ( $i=0; $i<$query_cnt; $i++ ) {
+		//echo $sf_stats[$i]."<br>";
+		$ipt_res = ExecuteSQL($conn, $sf_stats[$i]);
+		if (!$ipt_res || GetNumOfResultRows($ipt_res) == 0)
+			continue;
+
+		$dp_tick = $scale_set['cnt'];
+		//$scl_cmb_step_back = $scl_cmb_last;
+		while ( ($ipt_row_rsv=FetchAssocArray($ipt_res)) && $dp_tick>0 ) {
+			$scl_tv_db_this = $ipt_row_rsv['tu'];
+			do {
+				//echo "scl_dbtv-".$scl_tv_db_this.", step-".$data_pool[$dp_tick-1]['tv']."<br>";
+
+				if ( $scl_tv_db_this > $data_pool[$dp_tick-1]['tv'] )
+					break;		//Go Fetch Next Row
+
+				$scl_next = 0;
+				if ( $scl_tv_db_this == $data_pool[$dp_tick-1]['tv'] ) {
+					//if ( true == $is_ip_spec ) {
+					if ( $query_cnt > 1 ) {
+						if ( 0 == $i )
+       	                        	                $data_pool[$dp_tick-1]['down'] = $ipt_row_rsv['bsz'];
+						else
+							$data_pool[$dp_tick-1]['up'] = $ipt_row_rsv['bsz'];
+					}
+					else {
+						$data_pool[$dp_tick-1]['up'] = $ipt_row_rsv['bsz_up'];
+						$data_pool[$dp_tick-1]['down'] = $ipt_row_rsv['bsz_down'];
+					}
+					$scl_next = 1;
+				}
+
+				// Previous Data-Point
+				//$scl_cmb_step_back = nf_get_cmb_previous($scl_cmb_step_back, $scl_cmb_layer);
+				$dp_tick--;
+			} while(!$scl_next && $dp_tick>0);
+		}
+	}
+
+	return $data_pool;
+}
+
+
+?>
