@@ -1,0 +1,895 @@
+﻿# Copyright (C) 2000-2002 Carnegie Mellon University
+#
+# Maintainer: Roman Danyliw <rdd@cert.org>, <roman@danyliw.com>
+#
+# Original Author(s): Jed Pickel <jed@pickel.net>    (2000-2001)
+#                     Roman Danyliw <rdd@cert.org>
+#                     Todd Schrubb <tls@cert.org>
+#                     SN: 38735ebda1e25d7258b4070181bf922b
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License Version 2 as
+# published by the Free Software Foundation.  You may not use, modify or
+# distribute this program under any other version of the GNU General
+# Public License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+
+USE `surveyor`;
+set names utf8;
+CREATE TABLE IF NOT EXISTS `schema` ( vseq        INT      UNSIGNED NOT NULL,
+                      ctime       DATETIME NOT NULL,
+                      PRIMARY KEY (vseq));
+DELETE FROM `schema`;
+INSERT INTO `schema`  (vseq, ctime) VALUES ('107', now());       
+
+CREATE TABLE IF NOT EXISTS event  ( id          BIGINT      UNSIGNED NOT NULL AUTO_INCREMENT,
+                      sid 	  INT 	   UNSIGNED NOT NULL,
+                      bid 	  INT 	   UNSIGNED NOT NULL,
+                      cid 	  BIGINT   UNSIGNED NOT NULL,
+                      signature   INT      UNSIGNED NOT NULL, 
+                      timestamp 	   DATETIME NOT NULL,
+                      PRIMARY KEY (id,sid,bid,cid),
+                      INDEX       sig (signature),
+                      INDEX       time (timestamp));
+
+CREATE TABLE IF NOT EXISTS intranet_config  ( id	INT	UNSIGNED NOT NULL AUTO_INCREMENT,
+			home_net		VARCHAR(4096) NOT NULL,
+			external_net		VARCHAR(4096) NOT NULL,
+			dns_servers		VARCHAR(4096) NOT NULL,
+			smtp_servers		VARCHAR(4096) NOT NULL,
+			http_servers		VARCHAR(4096) NOT NULL,
+			sql_servers		VARCHAR(4096) NOT NULL,
+			telnet_servers		VARCHAR(4096) NOT NULL,
+			ssh_servers		VARCHAR(4096) NOT NULL,
+			ftp_servers		VARCHAR(4096) NOT NULL,
+			sip_servers		VARCHAR(4096) NOT NULL,
+			http_ports		VARCHAR(4096) NOT NULL,
+			PRIMARY KEY (id));
+
+
+CREATE TABLE IF NOT EXISTS approto_ports_system  ( id	INT UNSIGNED NOT NULL AUTO_INCREMENT,
+			port				SMALLINT UNSIGNED NOT NULL,
+			proto_type			INT UNSIGNED NOT NULL,    #TCP=0|UDP=1
+			approto_idx			INT UNSIGNED NOT NULL,    #application protocol index
+			approto				VARCHAR(256) NOT NULL,
+			approto_desc			VARCHAR(256) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+			PRIMARY KEY (id));
+			
+CREATE TABLE IF NOT EXISTS approto_ports_user  ( id	INT UNSIGNED NOT NULL,
+			port				SMALLINT UNSIGNED NOT NULL,
+			proto_type			INT UNSIGNED NOT NULL,    #TCP=0|UDP=1
+			approto_idx			INT UNSIGNED NOT NULL,    #application protocol index
+			approto_desc			VARCHAR(256) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL,
+			pp_switch			SMALLINT UNSIGNED NOT NULL,    #0: switch off; 1: switch on
+			pp_shift			SMALLINT UNSIGNED NOT NULL,    #used to sync from es
+			renew				SMALLINT UNSIGNED NOT NULL,    #0: port not changed; 1: port changed
+			PRIMARY KEY (id));
+
+CREATE TABLE IF NOT EXISTS ip_whitelist_system  ( id	INT UNSIGNED NOT NULL AUTO_INCREMENT,
+			ip				INT UNSIGNED NOT NULL,
+			description			VARCHAR(256) NOT NULL DEFAULT'Trusted IP Address',
+			PRIMARY KEY (id));
+
+
+# encoding is a lookup table for storing encoding types
+CREATE TABLE IF NOT EXISTS encoding(encoding_type TINYINT UNSIGNED NOT NULL,
+                      encoding_text TEXT NOT NULL,
+                      PRIMARY KEY (encoding_type));
+DELETE FROM `encoding`;
+INSERT INTO encoding (encoding_type, encoding_text) VALUES (0, 'hex');
+INSERT INTO encoding (encoding_type, encoding_text) VALUES (1, 'base64');
+INSERT INTO encoding (encoding_type, encoding_text) VALUES (2, 'ascii');
+
+# detail is a lookup table for storing different detail levels
+CREATE TABLE IF NOT EXISTS detail  (detail_type TINYINT UNSIGNED NOT NULL,
+                      detail_text TEXT NOT NULL,
+                      PRIMARY KEY (detail_type));
+DELETE FROM `detail`;
+INSERT INTO detail (detail_type, detail_text) VALUES (0, 'fast');
+INSERT INTO detail (detail_type, detail_text) VALUES (1, 'full');
+
+# be sure to also use the snortdb-extra tables if you want
+# mappings for tcp flags, protocols, and ports
+
+#protocol_stats for statistic
+CREATE TABLE IF NOT EXISTS protocol_stats (               id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          name                  VARCHAR(16)                     NOT NULL,
+                                                          ps_id                 INT             UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          user                  TINYINT         UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          direction             TINYINT         UNSIGNED        NOT NULL,
+                                                          cnt                   BIGINT          UNSIGNED        NOT NULL,
+                                                          bsz                   BIGINT          UNSIGNED        NOT NULL,
+                                                          bps                   INT             UNSIGNED        NOT NULL,
+                                                          last_time             TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                                                          UNIQUE(ps_id, direction),
+                                                          PRIMARY KEY (id),UNIQUE KEY(name,ps_id,direction));
+CREATE TABLE IF NOT EXISTS nfproto_stall   (              id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          name                  VARCHAR(32)                     NOT NULL,
+                                                          ps_id                 INT             UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          scale                 TINYINT         UNSIGNED        NOT NULL,    # 0,hour;1,day;2,week;3,month;4,year
+                                                          dt_seq                INT             UNSIGNED        NOT NULL,
+                                                          dt_ts                 VARCHAR(32)                     NOT NULL,
+                                                          cnt_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          PRIMARY KEY (id));
+CREATE TABLE IF NOT EXISTS nfproto_hour   (               id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          name                  VARCHAR(16)                     NOT NULL,
+                                                          ps_id                 INT             UNSIGNED        NOT NULL,
+                                                          proto                 SMALLINT        UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          dt_seq                INT             UNSIGNED        NOT NULL,
+                                                          dt_ts                 VARCHAR(32)                     NOT NULL,
+                                                          cnt_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          PRIMARY KEY (id));
+CREATE TABLE IF NOT EXISTS nfproto_day   (                id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          name                  VARCHAR(16)                     NOT NULL,
+                                                          ps_id                 INT             UNSIGNED        NOT NULL,
+                                                          proto                 SMALLINT        UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          dt_seq                INT             UNSIGNED        NOT NULL,
+                                                          dt_ts                 VARCHAR(32)                     NOT NULL,
+                                                          cnt_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          PRIMARY KEY (id));
+CREATE TABLE IF NOT EXISTS nfproto_week   (               id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          name                  VARCHAR(16)                     NOT NULL,
+                                                          ps_id                 INT             UNSIGNED        NOT NULL,
+                                                          proto                 SMALLINT        UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          dt_seq                INT             UNSIGNED        NOT NULL,
+                                                          dt_ts                 VARCHAR(32)                     NOT NULL,
+                                                          cnt_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          PRIMARY KEY (id));
+CREATE TABLE IF NOT EXISTS nfproto_month   (              id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          name                  VARCHAR(16)                     NOT NULL,
+                                                          ps_id                 INT             UNSIGNED        NOT NULL,
+                                                          proto                 SMALLINT        UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          dt_seq                INT             UNSIGNED        NOT NULL,
+                                                          dt_ts                 VARCHAR(32)                     NOT NULL,
+                                                          cnt_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          PRIMARY KEY (id));
+CREATE TABLE IF NOT EXISTS nfproto_year   (               id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          name                  VARCHAR(16)                     NOT NULL,
+                                                          ps_id                 INT             UNSIGNED        NOT NULL,
+                                                          proto                 SMALLINT        UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          dt_seq                INT             UNSIGNED        NOT NULL,
+                                                          dt_ts                 VARCHAR(32)                     NOT NULL,
+                                                          cnt_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_up                BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz_down              BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          cnt                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          bsz                   BIGINT          UNSIGNED NOT NULL DEFAULT '0',
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          PRIMARY KEY (id));
+
+CREATE TABLE IF NOT EXISTS nfgeo_state                  ( id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                INT             UNSIGNED        NOT NULL,
+                                                          INDEX id_idx (geo_id),
+                                                          UNIQUE(geo_id),
+                                                          PRIMARY KEY (id,geo_id))ENGINE=InnoDB PARTITION BY HASH(geo_id) PARTITIONS 16;
+#INSERT INTO `nfgeo_state` (`geo_id`) VALUES (1814991);
+INSERT INTO `nfgeo_state` (`geo_id`) SELECT * FROM (SELECT 1814991) AS thmp WHERE NOT EXISTS (SELECT geo_id FROM nfgeo_state WHERE geo_id=1814991) LIMIT 1;
+CREATE TABLE IF NOT EXISTS nfgeo_subdv                  ( id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                INT             UNSIGNED        NOT NULL,
+                                                          INDEX id_idx (geo_id),
+                                                          UNIQUE(geo_id),
+                                                          PRIMARY KEY (id,geo_id))ENGINE=InnoDB PARTITION BY HASH(geo_id) PARTITIONS 32;
+#INSERT INTO `nfgeo_subdv` (`geo_id`) VALUES (0);
+INSERT INTO `nfgeo_subdv` (`geo_id`) SELECT * FROM (SELECT 0) AS thmp WHERE NOT EXISTS (SELECT geo_id FROM nfgeo_subdv WHERE geo_id=0) LIMIT 1;
+CREATE TABLE IF NOT EXISTS nfgeo_citys                  ( id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                INT             UNSIGNED        NOT NULL,
+                                                          INDEX id_idx (geo_id),
+                                                          UNIQUE(geo_id),
+                                                          PRIMARY KEY (id,geo_id))ENGINE=InnoDB PARTITION BY HASH(geo_id) PARTITIONS 64;
+#INSERT INTO `nfgeo_citys` (`geo_id`) VALUES (0);
+INSERT INTO `nfgeo_citys` (`geo_id`) SELECT * FROM (SELECT 0) AS thmp WHERE NOT EXISTS (SELECT geo_id FROM nfgeo_citys WHERE geo_id=0) LIMIT 1;
+CREATE TABLE IF NOT EXISTS nfgeo_info                   ( id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          state_gid             INT             UNSIGNED        NOT NULL,
+                                                          subdv_gid             INT             UNSIGNED        NOT NULL,
+                                                          city_gid              INT             UNSIGNED        NOT NULL,
+                                                          INDEX id_idx (geo_id),
+                                                          UNIQUE(state_gid, subdv_gid, city_gid),
+                                                          PRIMARY KEY (id))ENGINE=InnoDB;
+
+#ipv4_stats for statistic
+CREATE TABLE IF NOT EXISTS nfiptet_stats                ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          sf_sta                INT             UNSIGNED        NOT NULL,
+                                                          ip_src                INT             UNSIGNED        NOT NULL,
+                                                          ip_dst                INT             UNSIGNED        NOT NULL,
+                                                          tv_start              INT             UNSIGNED        NOT NULL,       #first pkt time 
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          direc                 TINYINT         UNSIGNED        NOT NULL,
+                                                          almflag               INT             UNSIGNED        NOT NULL,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          cnt                   BIGINT          UNSIGNED        NOT NULL,
+                                                          bsize                 BIGINT          UNSIGNED        NOT NULL,
+                                                          syn                   BIGINT          UNSIGNED        NOT NULL,
+                                                          dns                   BIGINT          UNSIGNED        NOT NULL,
+                                                          tpp                   BIGINT          UNSIGNED        NOT NULL,
+                                                          upp                   BIGINT          UNSIGNED        NOT NULL,
+                                                          tpp_u                 BIGINT          UNSIGNED        NOT NULL,
+                                                          upp_u                 BIGINT          UNSIGNED        NOT NULL,
+                                                          p_other               BIGINT          UNSIGNED        NOT NULL,
+                                                          INDEX id_idx (id),
+                                                          INDEX ip_src_idx (ip_src),
+                                                          INDEX ip_dst_idx (ip_dst),
+                                                          PRIMARY KEY (id))ENGINE=InnoDB PARTITION BY HASH(id) PARTITIONS 256;
+CREATE TABLE IF NOT EXISTS nfiptet_geo                  ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          ip_targ               INT             UNSIGNED        NOT NULL,
+                                                          city_gid              INT             UNSIGNED        NOT NULL,
+                                                          state_gid             INT             UNSIGNED        NOT NULL,
+                                                          subdv_gid             INT             UNSIGNED        NOT NULL,
+                                                          INDEX ipt_id_idx (ipt_id),
+                                                          INDEX geo_id_idx (geo_id),
+                                                          INDEX ip_targ_idx (ip_targ),
+                                                          PRIMARY KEY (id,ip_targ))ENGINE=InnoDB PARTITION BY HASH(ip_targ) PARTITIONS 256;
+                                                          #PRIMARY KEY (id,ipt_id,subdv_gid,state_gid))ENGINE=InnoDB
+                                                          #PARTITION BY RANGE( state_gid )
+                                                          #SUBPARTITION BY HASH( subdv_gid )
+                                                          #SUBPARTITIONS 32 (
+                                                          #    PARTITION p0 VALUES LESS THAN (1814990),
+                                                          #    PARTITION p1 VALUES LESS THAN (1814992),
+                                                          #    PARTITION p2 VALUES LESS THAN MAXVALUE
+                                                          #);
+                                                          # PARTITION BY HASH(state_gid) PARTITIONS 8 SUBPARTITION BY HASH(city_gid) SUBPARTITIONS 32;
+CREATE TABLE IF NOT EXISTS nfiptet_geo_scale_l1         ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_up                INT             UNSIGNED        NOT NULL,
+                                                          bsz_up                INT             UNSIGNED        NOT NULL,
+                                                          cnt_dn                INT             UNSIGNED        NOT NULL,
+                                                          bsz_dn                INT             UNSIGNED        NOT NULL,
+                                                          INDEX geo_id_idx (geo_id),
+                                                          UNIQUE(geo_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 64;
+CREATE TABLE IF NOT EXISTS nfiptet_geo_scale_l2         ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_up                INT             UNSIGNED        NOT NULL,
+                                                          bsz_up                INT             UNSIGNED        NOT NULL,
+                                                          cnt_dn                INT             UNSIGNED        NOT NULL,
+                                                          bsz_dn                INT             UNSIGNED        NOT NULL,
+                                                          INDEX geo_id_idx (geo_id),
+                                                          UNIQUE(geo_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 256;
+CREATE TABLE IF NOT EXISTS nfiptet_geo_scale_l3         ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_up                INT             UNSIGNED        NOT NULL,
+                                                          bsz_up                INT             UNSIGNED        NOT NULL,
+                                                          cnt_dn                INT             UNSIGNED        NOT NULL,
+                                                          bsz_dn                INT             UNSIGNED        NOT NULL,
+                                                          INDEX geo_id_idx (geo_id),
+                                                          UNIQUE(geo_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 64;
+CREATE TABLE IF NOT EXISTS nfiptet_geo_scale_l4         ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_up                INT             UNSIGNED        NOT NULL,
+                                                          bsz_up                INT             UNSIGNED        NOT NULL,
+                                                          cnt_dn                INT             UNSIGNED        NOT NULL,
+                                                          bsz_dn                INT             UNSIGNED        NOT NULL,
+                                                          INDEX geo_id_idx (geo_id),
+                                                          UNIQUE(geo_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 64;
+CREATE TABLE IF NOT EXISTS nfssn_stats                  ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          cnt_up                INT             UNSIGNED        NOT NULL,
+                                                          bsz_up                INT             UNSIGNED        NOT NULL,
+                                                          cnt_down              INT             UNSIGNED        NOT NULL,
+                                                          bsz_down              INT             UNSIGNED        NOT NULL,
+                                                          flg_psh               INT             UNSIGNED        NOT NULL,
+                                                          bsz_sml               INT             UNSIGNED        NOT NULL,
+                                                          tv_start              INT             UNSIGNED        NOT NULL,       #indicate session start time-seconds
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          tv_dur                INT             UNSIGNED        NOT NULL,       #indicate session duration time-seconds
+                                                          port_src              SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_dst              SMALLINT        UNSIGNED        NOT NULL,
+                                                          proto                 TINYINT         UNSIGNED        NOT NULL,
+                                                          direction             TINYINT         UNSIGNED        NOT NULL,
+                                                          state                 TINYINT         UNSIGNED        NOT NULL DEFAULT'0',
+                                                          #cap_hb                TINYINT         UNSIGNED        NOT NULL DEFAULT'0',
+                                                          key(id),
+                                                          INDEX ipt_id_idx (ipt_id),
+                                                          PRIMARY KEY (id,ipt_id))ENGINE=InnoDB PARTITION BY HASH(ipt_id) PARTITIONS 1024;
+CREATE TABLE IF NOT EXISTS nfssn_stats_sfaly            ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ssn_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          almflag               INT             UNSIGNED        NOT NULL DEFAULT'0',
+                                                          aly_stat              TINYINT         UNSIGNED        NOT NULL DEFAULT'0',
+                                                          INDEX ssn_id_idx (ssn_id),
+                                                          PRIMARY KEY (id,ssn_id))ENGINE=InnoDB PARTITION BY HASH(ssn_id) PARTITIONS 1024;
+CREATE TABLE IF NOT EXISTS nfssn_track_hbpkt            ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ssn_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          tv_stamp              INT             UNSIGNED        NOT NULL,       #last update time
+                                                          pkt_sample            BLOB,
+                                                          INDEX ssn_id_idx (ssn_id),
+                                                          PRIMARY KEY (id,ssn_id))ENGINE=InnoDB DEFAULT CHARSET=utf8 PARTITION BY HASH(ssn_id) PARTITIONS 256;
+CREATE TABLE IF NOT EXISTS nfprotp_stats                ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          ip_src                INT             UNSIGNED        NOT NULL,
+                                                          ip_dst                INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,       #last update time
+                                                          proto                 SMALLINT        UNSIGNED        NOT NULL,
+                                                          port                  SMALLINT        UNSIGNED        NOT NULL,
+                                                          port_idx              TINYINT         UNSIGNED        NOT NULL,
+                                                          user_set              TINYINT         UNSIGNED        NOT NULL,
+                                                          reset                 TINYINT         UNSIGNED        NOT NULL,
+                                                          cnt_vi                BIGINT          UNSIGNED        NOT NULL,
+                                                          bsz_vi                BIGINT          UNSIGNED        NOT NULL,
+                                                          cnt_vo                BIGINT          UNSIGNED        NOT NULL,
+                                                          bsz_vo                BIGINT          UNSIGNED        NOT NULL,
+                                                          INDEX ipt_id_idx (ipt_id),
+                                                          INDEX ip_src_idx (ip_src),
+                                                          INDEX ip_dst_idx (ip_dst),
+                                                          INDEX portqidx (port_idx),
+                                                          PRIMARY KEY (id,ipt_id))ENGINE=InnoDB PARTITION BY HASH(ipt_id) PARTITIONS 256;
+CREATE TABLE IF NOT EXISTS nfprotp_stats_scale_l1        ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          pp_id                 BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vi                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vi                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vo                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vo                INT             UNSIGNED        NOT NULL,
+                                                          direc                 TINYINT         UNSIGNED        NOT NULL,
+                                                          INDEX ipt_id_idx (ipt_id),
+                                                          INDEX geo_id_idx (geo_id),
+                                                          INDEX pp_id_idx (pp_id),
+                                                          UNIQUE(pp_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 256;
+CREATE TABLE IF NOT EXISTS nfprotp_stats_scale_l2        ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          pp_id                 BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vi                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vi                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vo                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vo                INT             UNSIGNED        NOT NULL,
+                                                          direc                 TINYINT         UNSIGNED        NOT NULL,
+                                                          INDEX ipt_id_idx (ipt_id),
+                                                          INDEX geo_id_idx (geo_id),
+                                                          INDEX pp_id_idx (pp_id),
+                                                          UNIQUE(pp_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 1024;
+CREATE TABLE IF NOT EXISTS nfprotp_stats_scale_l3        ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          pp_id                 BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vi                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vi                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vo                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vo                INT             UNSIGNED        NOT NULL,
+                                                          direc                 TINYINT         UNSIGNED        NOT NULL,
+                                                          INDEX ipt_id_idx (ipt_id),
+                                                          INDEX geo_id_idx (geo_id),
+                                                          INDEX pp_id_idx (pp_id),
+                                                          UNIQUE(pp_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 256;
+CREATE TABLE IF NOT EXISTS nfprotp_stats_scale_l4        ( id                    BIGINT          UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          ipt_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          geo_id                BIGINT          UNSIGNED        NOT NULL,
+                                                          pp_id                 BIGINT          UNSIGNED        NOT NULL,
+                                                          scl_cmb               INT             UNSIGNED        NOT NULL,
+                                                          tv_upd                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vi                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vi                INT             UNSIGNED        NOT NULL,
+                                                          cnt_vo                INT             UNSIGNED        NOT NULL,
+                                                          bsz_vo                INT             UNSIGNED        NOT NULL,
+                                                          direc                 TINYINT         UNSIGNED        NOT NULL,
+                                                          INDEX ipt_id_idx (ipt_id),
+                                                          INDEX geo_id_idx (geo_id),
+                                                          INDEX pp_id_idx (pp_id),
+                                                          UNIQUE(pp_id, scl_cmb),
+                                                          PRIMARY KEY (id,scl_cmb))ENGINE=InnoDB PARTITION BY HASH(scl_cmb) PARTITIONS 256;
+CREATE TABLE IF NOT EXISTS nf_ins_track                 ( id                    INT             UNSIGNED        NOT NULL AUTO_INCREMENT,
+                                                          cur_ipt_id            BIGINT          UNSIGNED        NOT NULL,
+                                                          max_ipt_id            BIGINT          UNSIGNED        NOT NULL,
+                                                          cur_ssn_id            BIGINT          UNSIGNED        NOT NULL,
+                                                          max_ssn_id            BIGINT          UNSIGNED        NOT NULL,
+                                                          key(id),
+                                                          INDEX ins_track_idx (id));
+#chad added ipv4_stats to save the ip traffic
+CREATE TABLE IF NOT EXISTS ipv4_stats		( id 			INT 		UNSIGNED 	NOT NULL AUTO_INCREMENT,
+							  ip 			VARCHAR(32) 			NOT NULL,
+							  count 		BIGINT 		UNSIGNED	NOT NULL,
+							  Bps 			INT 		UNSIGNED	NOT NULL,
+							  total 		BIGINT 		UNSIGNED	NOT NULL,
+							  last_time 	TIMESTAMP 	NOT NULL DEFAULT CURRENT_TIMESTAMP,
+							  PRIMARY KEY (id),UNIQUE KEY name (ip));
+
+#chad added port_stats to save the port traffic	  
+CREATE TABLE IF NOT EXISTS port_stats 	( id 			INT 		UNSIGNED 	NOT NULL AUTO_INCREMENT,
+							  port 			INT 		UNSIGNED 	NOT NULL,
+							  count 		BIGINT  	UNSIGNED	NOT NULL,
+							  Bps 			INT 		UNSIGNED	NOT NULL,
+							  total 		BIGINT  	UNSIGNED	NOT NULL,
+							  last_time 	TIMESTAMP	NOT NULL DEFAULT CURRENT_TIMESTAMP,
+							  PRIMARY KEY (id),UNIQUE KEY name (port));
+							  
+			  
+
+# property ip 
+CREATE TABLE  IF NOT EXISTS `property_ip` (`id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, 
+      `ip` varchar(128) UNIQUE NOT NULL,
+      `description` text,
+      `create_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      `create_type` int(10) DEFAULT 0  COMMENT" 0:mannal , 1:auto detected" ,
+       PRIMARY KEY(id)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8 ;
+
+# property ip index
+CREATE TABLE  IF NOT EXISTS `property_ip_index` (`id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, 
+      `index_name` varchar(128) UNIQUE NOT NULL,
+      `start_ip` varchar(128) UNIQUE NOT NULL,
+      `end_ip` varchar(128) UNIQUE NOT NULL,
+      `description` text,
+      `create_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8 ;
+
+# policy_set 
+CREATE TABLE  IF NOT EXISTS `policy_set` (`id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, 
+      `name` varchar(40) BINARY UNIQUE NOT NULL,
+      `description` varchar(128) ,
+      `type` int(10) DEFAULT 0,
+      `info` varchar(1200),
+      PRIMARY KEY(id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8; 
+
+
+# protected_ip_index
+CREATE TABLE  IF NOT EXISTS `protected_ip_index` (`id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, 
+     `index_name` varchar(128) UNIQUE NOT NULL,
+     `start_ip` varchar(128) UNIQUE NOT NULL,
+     `end_ip` varchar(128) UNIQUE NOT NULL,
+     `policy_name` varchar(40),
+     PRIMARY KEY(id)
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+# protected_ip_list
+CREATE TABLE  IF NOT EXISTS `protected_ip_list` (`id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, 
+     `ip` varchar(40) UNIQUE NOT NULL,
+     `policy_name` varchar(40) ,
+     PRIMARY KEY(id)
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8; 
+
+# macro_define
+CREATE TABLE  IF NOT EXISTS `macro_define` (`id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, 
+    `name` varchar(20) NOT NULL UNIQUE,
+    `value` INT(10)  DEFAULT'0' ,
+    `comment` varchar(50) DEFAULT'0', 
+    PRIMARY KEY(id) 
+)default charset=utf8;
+
+#INSERT INTO macro_define(name, value,comment) values('login_max_tries', 5,'max tries for all users on longin failure');
+
+# sql_audit
+CREATE TABLE  IF NOT EXISTS `sql_audit` (`id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+     `table_name` varchar(20) ,
+     `record_id`    INT(10) ,
+     `operation_info` varchar(20)  DEFAULT'0' ,
+     `operation_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     `sql_username` varchar(50) ,
+      PRIMARY KEY(id) 
+)default charset=utf8;
+
+
+
+
+#sysinfo table
+CREATE TABLE IF NOT EXISTS cpu_info (
+                        proc_id     INT    UNSIGNED NOT NULL,
+                        phys_id     INT    UNSIGNED NOT NULL,
+                        core_id     INT    UNSIGNED NOT NULL,
+                        core_utl    FLOAT           NOT NULL,
+                        PRIMARY KEY (proc_id));
+
+CREATE TABLE IF NOT EXISTS disk_info ( disk_all   BIGINT UNSIGNED NOT NULL,
+                         disk_free  BIGINT UNSIGNED NOT NULL,
+                         disk_utl   FLOAT           NOT NULL);
+
+CREATE TABLE IF NOT EXISTS mem_info ( mem_all     BIGINT UNSIGNED NOT NULL,
+                        mem_free    BIGINT UNSIGNED NOT NULL,
+                        mem_utl     FLOAT  UNSIGNED NOT NULL);
+
+CREATE TABLE IF NOT EXISTS if_info ( 
+                       if_name          VARCHAR(60),
+                       if_state         TINYINT         NOT NULL,
+                       if_rxcnt         BIGINT UNSIGNED NOT NULL,
+                       if_rxbyte        BIGINT UNSIGNED NOT NULL,
+                       if_rxbps         BIGINT UNSIGNED NOT NULL,
+                       if_rxperc        FLOAT  UNSIGNED NOT NULL,
+                       if_txcnt         BIGINT UNSIGNED NOT NULL,
+                       if_txbyte        BIGINT UNSIGNED NOT NULL,
+                       if_txbps         BIGINT UNSIGNED NOT NULL,
+                       if_txperc        FLOAT  UNSIGNED NOT NULL,
+                       if_linkspeed     INT UNSIGNED NOT NULL);
+                       
+#for portrait, property ip list, attack_success_signature
+USE `surveyor`
+
+CREATE TABLE IF NOT EXISTS portrait (
+	id BIGINT   UNSIGNED NOT NULL AUTO_INCREMENT,
+	sid INT(10) UNSIGNED NOT NULL,
+	cid BIGINT  UNSIGNED NOT NULL,
+	bid INT(10) UNSIGNED NOT NULL,
+	attack_ip INT(10) UNSIGNED NOT NULL,
+	property_ip INT(10) UNSIGNED NOT NULL,
+	attack_signature  VARCHAR(255),
+	attack_type VARCHAR(60),
+	attack_status tinyint,
+	rule_id INT(10) UNSIGNED NOT NULL,
+	protocol VARCHAR(10) default NULL,
+	app_proto CHAR(10) default NULL,
+	dport INT(10) UNSIGNED,
+	sport INT(10) UNSIGNED,
+	timestamp DATETIME NOT NULL,
+	summary TEXT NULL,
+	notes CHAR(128) NULL,
+	month INT(10) UNSIGNED,
+	handled TINYINT DEFAULT 0,
+	attack_level TINYINT DEFAULT 2,
+	attack_ip_desc CHAR(20),
+	property_ip_desc CHAR(20),
+	PRIMARY KEY (id, timestamp,month),
+	KEY (sid),
+	KEY (cid),
+	KEY (timestamp),
+	KEY(attack_ip),
+	KEY(property_ip),
+	KEY(attack_type)
+)  ENGINE=InnoDB DEFAULT CHARSET=utf8
+  partition by range(to_days(timestamp))
+  subpartition by key (month)
+  subpartitions 12
+  (
+   partition p2016 values less than (to_days('2017-01-01 00:00:00')),
+   partition p2017 values less than (to_days('2018-01-01 00:00:00')),
+   partition p2018 values less than (to_days('2019-01-01 00:00:00')),
+   partition p2019 values less than (to_days('2020-01-01 00:00:00')),
+   partition p2020 values less than (to_days('2021-01-01 00:00:00')),
+   partition p2021 values less than (to_days('2022-01-01 00:00:00')),
+   partition p2022 values less than (to_days('2023-01-01 00:00:00')),
+   partition p2023 values less than (to_days('2024-01-01 00:00:00')),
+   partition p2024 values less than (to_days('2025-01-01 00:00:00')),
+   partition p2025 values less than (to_days('2026-01-01 00:00:00')),
+   partition p2026 values less than (to_days('2027-01-01 00:00:00')),
+   partition p2027 values less than (to_days('2028-01-01 00:00:00')),
+   partition p2028 values less than (to_days('2029-01-01 00:00:00')),
+   partition p2029 values less than (to_days('2030-01-01 00:00:00')),
+   partition p2030 values less than (to_days('2031-01-01 00:00:00')),
+   partition p2031 values less than (to_days('2032-01-01 00:00:00'))
+ );
+
+CREATE TABLE IF NOT EXISTS attack_type_translation (
+	id INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+	type_english text NOT NULL,
+	type_chinese text NOT NULL,
+	level tinyint default 3,
+	treatment varchar(500),
+	PRIMARY KEY(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+#new attack types are to be listed here
+CREATE TABLE IF NOT EXISTS attack_success_signature (
+	id INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+	rule_id INT(10) UNSIGNED NOT NULL,
+	attack_type_english TEXT,
+	type INT(10) UNSIGNED,
+	signature TEXT NOT NULL,
+	PRIMARY KEY(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS portrait_slice_metainfo (
+	id INT(10) UNSIGNED NOT NULL AUTO_INCREMENT,
+	table_name VARCHAR(60) NOT NULL,
+	start_time DATETIME NOT NULL,
+	end_time DATETIME NOT NULL,
+	total_records INT(10) UNSIGNED NOT NULL,
+	total_success INT(10) UNSIGNED NOT NULL,
+	PRIMARY KEY(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+DELETE FROM `portrait_slice_metainfo`;
+CREATE TABLE IF NOT EXISTS ip_source (
+	ip VARCHAR(16) NOT NULL,
+	longitude FLOAT,
+	latitude  FLOAT,
+	country	  VARCHAR(64),
+	state	VARCHAR(64),
+	county	VARCHAR(64),
+	isp		VARCHAR(128),
+	PRIMARY KEY (ip)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS portrait_offset (
+	event_id BIGINT(20) UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+DELETE FROM `portrait_offset`;
+INSERT INTO `portrait_offset`(`event_id`) VALUES (0);
+
+CREATE TABLE IF NOT EXISTS attack_peaks (
+	type VARCHAR(10) NOT NULL,
+	max_attack_types INT(10) UNSIGNED NOT NULL,
+	max_hackers INT(10) UNSIGNED NOT NULL,
+	max_attacks INT(10) UNSIGNED NOT NULL,
+	max_attack_success INT(10) UNSIGNED NOT NULL,
+	current_attack_types INT(10) UNSIGNED NOT NULL,
+	current_hackers INT(10) UNSIGNED NOT NULL,
+	current_attacks INT(10) UNSIGNED NOT NULL,
+	current_attack_success INT(10) UNSIGNED NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+DELETE FROM `attack_peaks`;
+INSERT INTO `attack_peaks` (`type`, `max_attack_types`, `max_hackers`, `max_attacks`, `max_attack_success`,`current_attack_types`,
+`current_hackers`, `current_attacks`, `current_attack_success`) VALUES 
+('7h',0,0,0,0,0,0,0,0), 
+('24h',0,0,0,0,0,0,0,0), 
+('7d',0,0,0,0,0,0,0,0);
+
+CREATE TABLE IF NOT EXISTS event_log_id (
+	bid INT(10) UNSIGNED NOT NULL,
+	event_id INT(10) UNSIGNED NOT NULL,
+	PRIMARY KEY(bid)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+INSERT INTO event_log_id (bid, event_id) VALUES(0, 1), (1, 1), (2, 1), (3, 1);
+
+#hot entries for 24 hours
+CREATE TABLE IF NOT EXISTS portrait_24_hours (
+	id BIGINT   UNSIGNED NOT NULL AUTO_INCREMENT,
+	sid INT(10) UNSIGNED NOT NULL,
+	cid BIGINT  UNSIGNED NOT NULL,
+	bid INT(10) UNSIGNED NOT NULL,
+	attack_ip INT(10) UNSIGNED NOT NULL,
+	property_ip INT(10) UNSIGNED NOT NULL,
+	attack_signature  VARCHAR(255),
+	attack_type VARCHAR(60),
+	attack_status tinyint,
+	rule_id INT(10) UNSIGNED NOT NULL,
+	protocol VARCHAR(10) default NULL,
+	app_proto CHAR(10) default NULL,
+	dport INT(10) UNSIGNED,
+	sport INT(10) UNSIGNED,
+	timestamp DATETIME NOT NULL,
+	summary TEXT NULL,
+	notes CHAR(128) NULL,
+	month INT(10) UNSIGNED,
+	handled TINYINT DEFAULT 0,
+	attack_level TINYINT DEFAULT 2,
+	attack_ip_desc CHAR(20),
+	property_ip_desc CHAR(20),
+	PRIMARY KEY (id),
+	KEY (sid),
+	KEY (cid),
+	KEY (timestamp),
+	KEY(attack_ip),
+	KEY(property_ip),
+	KEY(attack_type)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+#attack ip table for latest 7 days
+
+CREATE TABLE IF NOT EXISTS attack_hot_ips (
+	id BIGINT   UNSIGNED NOT NULL AUTO_INCREMENT,
+	sid INT(10) UNSIGNED NOT NULL,
+	cid BIGINT  UNSIGNED NOT NULL,
+	bid INT(10) UNSIGNED NOT NULL,
+	attack_ip INT(10) UNSIGNED NOT NULL,
+	property_ip INT(10) UNSIGNED NOT NULL,
+	attack_signature  VARCHAR(255),
+	attack_type VARCHAR(60),
+	attack_status tinyint,
+	rule_id INT(10) UNSIGNED NOT NULL,
+	protocol VARCHAR(10) default NULL,
+	app_proto CHAR(10) default NULL,
+	dport INT(10) UNSIGNED,
+	sport INT(10) UNSIGNED,
+	timestamp DATETIME NOT NULL,
+	summary TEXT NULL,
+	notes CHAR(128) NULL,
+	month INT(10) UNSIGNED,
+	handled TINYINT DEFAULT 0,
+	attack_level TINYINT DEFAULT 2,
+	attack_ip_desc CHAR(20),
+	property_ip_desc CHAR(20),
+	PRIMARY KEY (id),
+	KEY (sid),
+	KEY (cid),
+	KEY (timestamp),
+	KEY(attack_ip),
+	KEY(property_ip),
+	KEY(attack_type)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+CREATE TABLE IF NOT EXISTS alerts (
+	id INT(10) UNSIGNED NOT NULL  AUTO_INCREMENT,
+	ipt_id BIGINT UNSIGNED NOT NULL DEFAULT'0',
+	almflag INT UNSIGNED NOT NULL DEFAULT'0',
+	property_ip INT(10) UNSIGNED NOT NULL,
+	remote_ips TEXT NULL,
+    property_port INT DEFAULT 0,
+    remote_port INT DEFAULT 0,
+    protocol char(32) DEFAULT '',
+    not_handled TINYINT default 1,
+    malicious_link TEXT default '',
+    suspicious_type TINYINT default 0, #0:suspicious property,1:port,2:region,3:proto,4:url,5:domain,6:ip,7:trojan
+	criteria TINYINT UNSIGNED NOT NULL,#0:anormal,1:port anormal,2:trojan host,3:trojan communication
+	algorithm TINYINT UNSIGNED NOT NULL, # static_search, heuristic, anomaly_detection
+	crit_level TINYINT UNSIGNED NOT NULL DEFAULT 2, #0:deadly, 1: high risk, 2: normal,3:suspicious
+	result TEXT,#suspicious_C&C, C&C, Worm, Trojan, AdWare
+	details TEXT,
+	tv_first INT UNSIGNED NOT NULL DEFAULT'31507200',	#earliest alarm
+	tv_last INT UNSIGNED NOT NULL DEFAULT'31507200',	#latest alarm
+	timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, # MySQL 5.6 and higher
+	month INT(10) UNSIGNED NOT NULL,
+	merge_cnt INT UNSIGNED NOT NULL DEFAULT'0',
+	INDEX id_idx (id),
+	PRIMARY KEY(id, timestamp, month)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+partition by range(to_days(timestamp))
+  subpartition by key (month)
+  subpartitions 12
+  (
+   partition p2016 values less than (to_days('2017-01-01 00:00:00')),
+   partition p2017 values less than (to_days('2018-01-01 00:00:00')),
+   partition p2018 values less than (to_days('2019-01-01 00:00:00')),
+   partition p2019 values less than (to_days('2020-01-01 00:00:00')),
+   partition p2020 values less than (to_days('2021-01-01 00:00:00')),
+   partition p2021 values less than (to_days('2022-01-01 00:00:00')),
+   partition p2022 values less than (to_days('2023-01-01 00:00:00')),
+   partition p2023 values less than (to_days('2024-01-01 00:00:00')),
+   partition p2024 values less than (to_days('2025-01-01 00:00:00')),
+   partition p2025 values less than (to_days('2026-01-01 00:00:00')),
+   partition p2026 values less than (to_days('2027-01-01 00:00:00')),
+   partition p2027 values less than (to_days('2028-01-01 00:00:00')),
+   partition p2028 values less than (to_days('2029-01-01 00:00:00')),
+   partition p2029 values less than (to_days('2030-01-01 00:00:00')),
+   partition p2030 values less than (to_days('2031-01-01 00:00:00')),
+   partition p2031 values less than (to_days('2032-01-01 00:00:00'))
+ );
+
+
+CREATE TABLE IF NOT EXISTS `flow_config` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `port` int(11) DEFAULT NULL COMMENT '端口',
+  `h_upflow` bigint unsigned DEFAULT 0 COMMENT '最大上行流量（时）',
+  `h_downflow` bigint unsigned DEFAULT 0 COMMENT '最大下行流量（时）',
+  `d_upflow` bigint unsigned DEFAULT 0 COMMENT '最大上行流量（天）',
+  `d_downflow` bigint unsigned DEFAULT 0 COMMENT '最大下行流量（天）',
+  `alarm` double DEFAULT NULL COMMENT '报警系数',
+  `datetimes` datetime DEFAULT NULL COMMENT '更新时间',
+  `flag` int(11) DEFAULT '0' COMMENT '是否启用机器学习（1：启用；0：禁用）',
+  `isapply` int(1) DEFAULT '0' COMMENT '是否应用：0（未应用），1（已应用）',
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS threaten_day_statistics (
+	id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+	attack_total_cnt INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred",
+	attack_critical_cnt INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred which is critical",
+	attack_success_cnt INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred is successful",
+	attack_tbc_cnt INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred which need to be confirm",
+	attacked_property_total_cnt INT UNSIGNED NOT NULL COMMENT "how many properties have been attacked totaly",
+	attacked_property_critical_cnt INT UNSIGNED NOT NULL COMMENT "how many properyties have been attacked and those attacks are very critical",
+	attacked_property_success_cnt INT UNSIGNED NOT NULL COMMENT "how many properties have been attacked successfully",
+	attacked_property_tbc_cnt INT UNSIGNED NOT NULL COMMENT "how many properyties have been attacked which need to be confirm",
+	suspect_total_cnt INT UNSIGNED NOT NULL COMMENT "total suspect",
+	suspect_attack_type_cnt INT UNSIGNED NOT NULL COMMENT "how many attack-type have been used by suspects",
+	suspicious_ip_cnt INT UNSIGNED NOT NULL COMMENT "how many suspicious ip have been visited by properties",
+	suspicious_domain_cnt INT UNSIGNED NOT NULL COMMENT "how many suspicious domain have been visited by properties",
+	suspicious_url_cnt INT UNSIGNED NOT NULL COMMENT "how many suspicious url have been visited by properties",
+	time datetime NOT NULL COMMENT "1 record each hour",
+	PRIMARY KEY (id),
+	KEY datetime (time)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS threaten_hour_statistics (
+	id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+	attack_total_cnt INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred",
+	attack_critical_cnt  INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred which are critical",
+	attack_success_cnt INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred is successful",
+	attack_tbc_cnt INT UNSIGNED NOT NULL COMMENT "how many attacks have occurred which need to be confirm",
+	attacked_property_total_cnt INT UNSIGNED NOT NULL COMMENT "how many properties have been attacked totaly",
+	attacked_property_critical_cnt INT UNSIGNED NOT NULL COMMENT "how many properyties have been attacked and those attacks are very critical",
+	attacked_property_success_cnt INT UNSIGNED NOT NULL COMMENT "how many properties have been attacked successfully",
+	attacked_property_tbc_cnt INT UNSIGNED NOT NULL COMMENT "how many properyties have been attacked which need to be confirm",
+	suspect_total_cnt INT UNSIGNED NOT NULL COMMENT "total suspect",
+	suspect_attack_type_cnt INT UNSIGNED NOT NULL COMMENT "how many attack-type have been used by suspects",
+	suspicious_ip_cnt INT UNSIGNED NOT NULL COMMENT "how many suspicious ip have been visited by properties",
+	suspicious_domain_cnt INT UNSIGNED NOT NULL COMMENT "how many suspicious domain have been visited by properties",
+	suspicious_url_cnt INT UNSIGNED NOT NULL COMMENT "how many suspicious url have been visited by properties",
+	time datetime NOT NULL COMMENT "time,one record each minute",
+	PRIMARY KEY (id),
+	KEY datetime (time)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS threaten_max_statistics (
+	id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+	attack_total_cnt INT UNSIGNED NOT NULL,
+	attack_critical_cnt INT UNSIGNED NOT NULL,
+	attack_success_cnt INT UNSIGNED NOT NULL,
+	attack_tbc_cnt INT UNSIGNED NOT NULL,
+	attacked_property_total_cnt INT UNSIGNED NOT NULL,
+	attacked_property_critical_cnt INT UNSIGNED NOT NULL,
+	attacked_property_success_cnt INT UNSIGNED NOT NULL,
+	attacked_property_tbc_cnt INT UNSIGNED NOT NULL,
+	suspect_total_cnt INT UNSIGNED NOT NULL,
+	suspect_attack_type_cnt INT UNSIGNED NOT NULL,
+	suspicious_ip_cnt INT UNSIGNED NOT NULL,
+	suspicious_domain_cnt INT UNSIGNED NOT NULL,
+	suspicious_url_cnt INT UNSIGNED NOT NULL,
+	time_type INT UNSIGNED NOT NULL COMMENT "0:day,1:month",
+	date DATETIME NOT NULL,
+	PRIMARY KEY (id)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+
+INSERT INTO threaten_max_statistics(time_type,date)values(1,now());
+INSERT INTO threaten_max_statistics(time_type,date)values(0,now());
+
+
+
+
