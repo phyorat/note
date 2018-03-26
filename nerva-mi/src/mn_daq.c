@@ -182,12 +182,15 @@ void mn_daq_breakloop_ext(void)
     daq_breakloop_ext(daq_mod);
 }
 
-int mn_daq_Init(ApDpLoadInfo *dpl, char *lcore_mask, uint64_t ap_lcores, char *intf, uint8_t log_dm)
+int mn_daq_Init(ApDpLoadInfo *dpl, char *lcore_mask, uint64_t ap_lcores, char *intf,
+        char *ex_par, uint8_t log_dm)
 {
     int err;
     DAQ_Config_t cfg;
     char var_buf[32];
     char buf[256] = "";
+    char dp_par[128];
+    char dp_fix_par[64] = {"-n 2 --proc-type=primary --base-virtaddr=0x2aaa4a90000"};
     char type[32];
     char dir[64] = { 0 };
     const char * pdirs[2];
@@ -226,7 +229,11 @@ int mn_daq_Init(ApDpLoadInfo *dpl, char *lcore_mask, uint64_t ap_lcores, char *i
     cfg.ap_dpl = dpl;
 
     daq_config_set_value(&cfg, NULL, NULL);
-    daq_config_set_value(&cfg, "dpdk_args", "-n 2 --proc-type=primary --base-virtaddr=0x2aaa4a90000");
+    if ( ex_par[0] )
+        snprintf(dp_par, sizeof(dp_par), "%s %s", ex_par, dp_fix_par);
+    else
+        strncpy(dp_par, dp_fix_par, sizeof(dp_fix_par));
+    daq_config_set_value(&cfg, "dpdk_args", dp_par);
     daq_config_set_value(&cfg, "dpdk_c_args", lcore_mask);
 
     cfg.flags |= DAQ_CFG_PROMISC | DAQ_CFG_MINERVA;

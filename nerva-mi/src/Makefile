@@ -8,12 +8,12 @@ release: libminv.a minerva
 #PUBLIB_DIR:=../../../PUBLIC_LIB
 #EXT_CFLAGS+=-I/usr/local/include_daq_206 -I$(PUBLIB_DIR)/include
 #EXT_LDFLAGS+=-L/usr/local/lib_daq_206 -L$(PUBLIB_DIR)/lib
-#RTE_SDK=/home/lhzy01/git/surveyor/usi_midware/dpdk-stable-16.07.2
+#RTE_SDK=/home/lhzy01/git/surveyor/usi_midware/dpdk-stable
 #RTE_TARGET=build
 #Test-Debug End
 
 EXT_CFLAGS+=-I$(RTE_SDK)/$(RTE_TARGET)/include -DBUILD_DPDK_MODULE -msse4 
-EXT_LDFLAGS+=-L./ -L/usr/lib/x86_64-linux-gnu -L$(RTE_SDK)/$(RTE_TARGET)/lib -Wl,--whole-archive,-ldpdk,--no-whole-archive 
+EXT_LDFLAGS+=-L./ -L/usr/lib/x86_64-linux-gnu -L$(RTE_SDK)/$(RTE_TARGET)/lib -Wl,--whole-archive,-ldpdk,--no-whole-archive -lnuma
 
 MI_DIR=./
 

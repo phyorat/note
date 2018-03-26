@@ -1871,8 +1871,8 @@ int sf_DBIns_Loop(void *dp_cfl)
                 aly_data.id_2 = htonl(tnode_geo->tet.src);
                 break;
             default:
-                LogMessage("%s: Aly(IPT-GEO) skip ipt_id %lu, direction %u.\n",
-                        __func__, tnode_geo->dbid, tnode_geo->direction);
+                /*LogMessage("%s: Aly(IPT-GEO) skip ipt_id %lu, direction %u.\n",
+                        __func__, tnode_geo->dbid, tnode_geo->direction);*/
                 continue;
             }
             aly_data.type = htonl(SF_ALY_GEO_MAP);

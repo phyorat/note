@@ -16,7 +16,8 @@ typedef struct {
 } StringVector;
 
 
-int mn_daq_Init(ApDpLoadInfo *dpl, char *lcore_mask, uint64_t ap_lcores, char *intf, uint8_t log_dm);
+int mn_daq_Init(ApDpLoadInfo *dpl, char *lcore_mask, uint64_t ap_lcores, char *intf,
+        char *ex_par, uint8_t log_dm);
 /*int mn_daq_WasStarted (void);
 int mn_daq_stop (void);*/
 void mn_daq_start(void);

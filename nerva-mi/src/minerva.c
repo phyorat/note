@@ -1,5 +1,4 @@
 /*
- * COPYRIGHT 2016, @UNIONSMART
  *
  */
 
@@ -94,6 +93,7 @@ int main(int argc, char *argv[])
     //char cmd[64];
     char lcore[32];
     char intf[32];
+    char ex_dp_para[64] = {0};
     char prog_name[16] = {"minerva"};
     char *p_arg;
 
@@ -138,6 +138,11 @@ int main(int argc, char *argv[])
             i++;
             if ( i<argc )
                 strncpy(intf, argv[i], sizeof(intf)-1);
+            break;
+        case 'e':
+            i++;
+            if ( i<argc )
+                strncpy(ex_dp_para, argv[i], sizeof(ex_dp_para)-1);
             break;
         default:
             syslog(LOG_NOTICE, "%s: Invalid parameter '%c'\n", prog_name, *(p_arg+1));
@@ -204,7 +209,8 @@ int main(int argc, char *argv[])
     dpl.sp_init = stats_ifport_init;
     dpl.sp_scale = stats_ifport_scale;
 
-    if ( mn_daq_Init(&dpl, lcore, lcore_utl, intf, log_daemon) ) {
+    if ( mn_daq_Init(&dpl, lcore, lcore_utl, intf,
+            ex_dp_para, log_daemon) ) {
         syslog(LOG_NOTICE, "%s: daq init failed\n", prog_name);
         return -1;
     }
