@@ -40,7 +40,7 @@ echo "crontab: NetFlow updating proto: scale--$nfproto_scale, datetime--$cur_dat
 update_netflow_scaling () {
     proto="$1"
     proto_stall="$1_stall"
-    #myvariable=$(mysql surveyor -u root -p13246<<<"SELECT count, total FROM protocol_stats where name='tcp'")
+    #myvariable=$(mysql surveyor -u root -p11111<<<"SELECT count, total FROM protocol_stats where name='tcp'")
     nfproto_stat_now=($(mysql --defaults-extra-file=/home/lhzy06/p_test/netflow_mysql.conf surveyor<<<"SELECT count as '', total as '' FROM $nfproto_pers where name='$proto'"))
     nfproto_stat_pre=($(mysql --defaults-extra-file=/home/lhzy06/p_test/netflow_mysql.conf surveyor<<<"SELECT ${ns_cnt} as '', ${ns_bph} as '' FROM $nfproto_scale where $ns_name='$proto_stall'"))
     nfproto_stat_scale=($(mysql --defaults-extra-file=/home/lhzy06/p_test/netflow_mysql.conf surveyor<<<"SELECT ${ns_cnt} as '', ${ns_bph} as '' FROM $nfproto_scale where $ns_name='$proto' and $ns_seq='$cur_datatime'"))
