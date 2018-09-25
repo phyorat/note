@@ -20,7 +20,7 @@ static const char password[32] = {
 		0x36+M_PASS_ENC_OS,
 		0x0 };*/
 static const char *user = "root";
-static const char *password = "13246";
+static const char *password = "11111";
 static MYSQL *sp_mysql = NULL;
 
 static Ifaceinfo if_info;
