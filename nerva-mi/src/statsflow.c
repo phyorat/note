@@ -12,7 +12,7 @@
 static const char *server = "localhost";
 static const char *database = "surveyor";
 static const char *user = "root";
-static const char *password = "13246";
+static const char *password = "11111";
 static MYSQL *sf_mysql;
 
 static const char *sfstack_apport_user_select = "select port,proto_type,approto_idx,approto_desc,pp_switch,renew "
