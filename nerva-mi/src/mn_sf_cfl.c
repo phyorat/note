@@ -15,7 +15,7 @@
 static const char *server = "localhost";
 static const char *database = "surveyor";
 static const char *user = "root";
-static const char *password = "13246";
+static const char *password = "11111";
 /*static const char user[32] = {
         0x72+M_USER_ENC_OS,
         0x6f+M_USER_ENC_OS,
