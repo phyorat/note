@@ -1,1 +1,7 @@
-lll
+1, Then type the following commands at a shell prompt:
+echo 1 > /proc/sys/kernel/sysrq
+echo c > /proc/sysrq-trigger
+This forces the Linux kernel to crash, and the address-YYYY-MM-DD-HH:MM:SS/vmcore file 
+is copied to the location you have selected in the configuration (that is, to /var/crash/ by default).
+
+2, 
