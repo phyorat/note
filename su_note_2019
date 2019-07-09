@@ -4,4 +4,12 @@ echo c > /proc/sysrq-trigger
 This forces the Linux kernel to crash, and the address-YYYY-MM-DD-HH:MM:SS/vmcore file 
 is copied to the location you have selected in the configuration (that is, to /var/crash/ by default).
 
-2, 
+2, In the event that makedumpfile fails, then it is necessary to increase the log level to 
+understand what is going wrong. This is different from setting the dump level and is achieved by 
+editing /etc/kdump.conf and increasing the message_level option to makedumpfile on the core_collector line entry.
+
+By default makedumpfile is set to level 7, which includes the progress indicator, common message, and error message output. 
+Set this level to 31 to get further debugging information.
+> Ensure that your core_collector config line looks similar to this when set:
+> core_collector makedumpfile -l --message-level 1 -d 31
+
