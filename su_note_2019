@@ -17,3 +17,6 @@ ip link set eth0 vf 2 spoofchk off
 
 4, batch: rename
 ls | xargs -I X sh -c 'a=$(echo X |sed -n "s/.*_//p"); mv X $a'
+
+5, get file permision with hex format
+stat -c '%a' filename
