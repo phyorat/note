@@ -1,8 +1,4 @@
-yingfu: yinzhi.yu@tieto.com yuuuuyin
 
-login as: pengghon
-pengghon@uv000467.sa.rd.tieto.com's password:
-Last login: Sun Dec 11 06:51:51 2011 from ww023530.ap.tieto.com
 -cueshell-3.00$ cleartool setview pengghon_view_cli_drop2a_dev_comp
 newgrp lct__
 umask 0002
@@ -41,9 +37,7 @@ devtool:
 /app/montavista/5.0/LMWP2/montavista/pro/devkit/ppc/83xx_nfp/bin/ppc_83xx_nfp-gdb
 
 
-lct in skelleftea:
-\\fileserv.sa.rd.tieto.com\lct
-remote server backup: WS002690 
+
 
 
 admin
@@ -423,7 +417,6 @@ unity;
 passion;
 meritocracy;
    
-\\fileserv.sa.rd.tieto.com\lct\Project\Recommended_MINI_LINK_reading
 
 ct mkbrtype -nc ln_tn51_nans_wp_cn_roleselection_llv_dev_xxicyan@/vobs/product/dxc_ip/xf_bns_src
 
